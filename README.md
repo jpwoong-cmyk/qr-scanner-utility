@@ -1,74 +1,27 @@
-# QR Utility | Phase 1
+# QR Scanner · Minimal utility (v2)
 
-A lightweight, mobile-first QR code scanner built with **HTML + CSS + JavaScript**. Design direction: **Utility App (B)**, with separate Camera, Upload image, and Result views.
+Mobile-first QR code scanner. Plain HTML, CSS, and JavaScript. No backend or build tools.
 
-## What's included
+## What's changed from Phase 1
 
-- Camera scanning, requesting permission only when the user taps **Start camera**.
-- Automatic QR detection and a **Stop camera** control.
-- Optional camera switching and flashlight, shown only when supported.
-- Decode QR codes from images and screenshots, including drag-and-drop on desktop.
-- View scanned text/URLs, copy the exact content, and manually open HTTPS/HTTP links.
-- **Scan again** and **Upload another** actions.
-- No database, account, or upload endpoint. QR decoding happens in the browser.
-- Camera is stopped when leaving the Camera view or when the page is backgrounded.
+- Removed sidebar, workspace/phase copy, privacy labels, footer, tabs, and result metadata.
+- Live camera preview uses `object-fit: contain` instead of `cover`, so the camera picture isn't visually cropped to fill the box.
+- Vertical physical-camera zoom slider at the right, initialized to 1× whenever the camera starts or flips, when the browser reports zoom support. If the device's supported zoom minimum is above 1, the app uses that minimum instead. If unavailable, the slider is hidden.
+- After scanning a URL, shows the decoded result with **Open** and **Scan again**. For non-link text, **Copy text** replaces Open.
+- Image upload remains available as a small secondary action, without a separate view.
 
-## Project structure
+## Deploy
 
-```text
-qr-scanner-utility/
-├── index.html        # Semantic markup and view structure
-├── style.css         # Responsive Utility App styling
-├── app.js            # Camera, image scanning, view and result logic
-├── favicon.svg       # Simple vector favicon
-├── vercel.json       # Hosting / security-response headers
-├── sample-qr.png     # Test QR code containing https://example.com/qr-utility-test
-└── README.md
-```
+1. Create a GitHub repository and place the extracted files at the repository root.
+2. In Vercel, import the repository; Framework Preset **Other**, no build command.
+3. Open the HTTPS deployment in your phone browser and tap **Start camera**.
 
-## Deploy with GitHub + Vercel (no npm)
+Files: `index.html`, `style.css`, `app.js`, `favicon.svg`, `sample-qr.png`, `vercel.json`, `README.md`.
 
-1. Create a new GitHub repository, for example `qr-scanner-utility`.
-2. Upload **all the files from this folder into the repository root** (not the parent ZIP folder).
-3. In [vercel.com/new](https://vercel.com/new), import the GitHub repository.
-4. Use **Framework Preset: Other**. No build command or install command is needed. Keep the output directory at the project root / default for a plain static site.
-5. Deploy. Open the resulting HTTPS URL on your phone.
-6. Tap **Start camera** and grant permission. You can also choose **Upload image**, then select `sample-qr.png` to test decoding.
+## Notes
 
-Every subsequent GitHub push to the deployed branch can trigger a fresh Vercel deployment.
-
-## Test locally
-
-Opening `index.html` directly via `file://` is not the recommended way to test JavaScript modules or camera permissions.
-
-If Python is available, run from the project directory:
-
-```bash
-python -m http.server 8000
-```
-
-Then visit `http://localhost:8000/` on your computer. Camera access is allowed on `localhost` in browsers that support it. For testing on a **phone**, use the **HTTPS Vercel URL** rather than your computer's local-network HTTP address.
-
-## Privacy and security
-
-- QR codes are decoded **locally** in the browser; no QR content, camera feed, or uploaded images are sent to the app server.
-- The QR decoding engine is lazily loaded from the **jsDelivr CDN** only when needed. Its code is a third-party dependency and requires a network connection to load unless cached by the browser. This request does not include your QR content.
-- Only absolute `http://` or `https://` links are offered an **Open link** action. Scanning never automatically follows a link.
-- Always check a scanned address before visiting. A QR can point to a malicious website.
-- The selected image is limited to 15 MB. Some formats (notably HEIC) depend on the browser's decoding support.
-- No scan history is persisted. Results are kept in memory only until the page is closed or refreshed.
-- The app is **not** an installed PWA in Phase 1.
-
-## Decoder library
-
-Uses [nimiq/qr-scanner](https://github.com/nimiq/qr-scanner) version `1.4.2` (MIT License), loaded as an ES module from jsDelivr:
-
-```text
-https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js
-```
-
-The library fetches its corresponding worker script as needed. No Node.js, npm, webpack, or framework is necessary for this app.
-
-## Possible Phase 2 enhancements
-
-Optional installable PWA, opt-in local scan history, better QR type recognition (Wi-Fi, vCard, email), and offline bundling of the scanner library. None are required for Phase 1.
+- Uses `qr-scanner@1.4.2` from jsDelivr at runtime. First-use requires internet.
+- Camera zoom uses `MediaStreamTrack.getCapabilities()` and `applyConstraints()`. Slider visibility and min/max depend on the phone/browser. '1×' is the camera's zoom setting, not necessarily the same field of view as your phone's native Camera app.
+- URL results **never open automatically**. Only explicit HTTP/HTTPS links get an Open button.
+- No scan history, server storage or upload destination.
+- For a fast image test, use the included `sample-qr.png`.

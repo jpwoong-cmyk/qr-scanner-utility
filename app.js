@@ -1,377 +1,290 @@
-// QR Utility, Phase 1. Plain JavaScript; no build tools or backend required.
-// The decoder is loaded only when a scan is requested. All decoding is local.
+// Browser-only QR scanner. Reuses Phase 1's decoder, camera/flash and image upload.
 const QR_LIBRARY_URL = 'https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js';
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
-
 const $ = (selector) => document.querySelector(selector);
-const elements = {
-  nav: [...document.querySelectorAll('[data-view]')],
-  panels: { camera: $('#camera-view'), upload: $('#upload-view'), result: $('#result-view') },
-  frame: $('#camera-frame'),
-  video: $('#camera-video'),
-  cameraStatus: $('#camera-status'),
-  cameraStatusText: $('#camera-status-text'),
-  startCamera: $('#start-camera'),
-  stopCamera: $('#stop-camera'),
-  switchCamera: $('#switch-camera'),
-  toggleFlash: $('#toggle-flash'),
-  flashLabel: $('#flash-label'),
-  dropzone: $('#upload-dropzone'),
-  imageInput: $('#image-input'),
-  imagePreviewWrap: $('#image-preview-wrap'),
-  imagePreview: $('#image-preview'),
-  uploadStatus: $('#upload-status'),
-  resultType: $('#result-type'),
-  resultSource: $('#result-source'),
-  resultText: $('#result-text'),
-  resultWarning: $('#result-warning'),
-  openLink: $('#open-link'),
+
+const ui = {
+  scannerView: $('#scanner-view'), resultView: $('#result-view'),
+  frame: $('#camera-frame'), video: $('#camera-video'),
+  cameraStatus: $('#camera-status'), cameraStatusText: $('#camera-status-text'),
+  start: $('#start-camera'), stop: $('#stop-camera'), flip: $('#switch-camera'), flash: $('#toggle-flash'),
+  zoomContainer: $('#zoom-control'), zoom: $('#zoom-slider'), zoomValue: $('#zoom-value'),
+  chooseImage: $('#choose-image'), imageInput: $('#image-input'),
+  resultText: $('#result-text'), open: $('#open-link'), copy: $('#copy-text'), again: $('#scan-again'),
   toast: $('#toast'),
 };
-
 const state = {
-  view: 'camera',
-  scanner: null,
-  running: false,
-  starting: false,
-  cameraRequest: 0,
-  imageRequest: 0,
-  facing: 'environment',
-  result: null,
-  previewUrl: null,
-  toastTimer: null,
+  scanner: null, running: false, starting: false, facing: 'environment',
+  request: 0, imageRequest: 0, zoomTrack: null, zoomWanted: null,
+  zoomApplying: false, result: null, toastTimer: null,
 };
-let modulePromise = null;
+let decoderPromise = null;
 
-function showToast(message) {
+function getDecoder() {
+  if (!decoderPromise) decoderPromise = import(QR_LIBRARY_URL).then(m => m.default).catch(err => { decoderPromise = null; throw err; });
+  return decoderPromise;
+}
+function toast(message) {
   clearTimeout(state.toastTimer);
-  elements.toast.textContent = message;
-  elements.toast.hidden = false;
-  state.toastTimer = setTimeout(() => { elements.toast.hidden = true; }, 2700);
+  ui.toast.textContent = message;
+  ui.toast.hidden = false;
+  state.toastTimer = setTimeout(() => { ui.toast.hidden = true; }, 2600);
 }
-
-function setCameraStatus(message, condition = 'idle') {
-  elements.cameraStatus.dataset.state = condition;
-  elements.cameraStatusText.textContent = message;
+function status(message, kind = 'idle') {
+  ui.cameraStatus.dataset.state = kind;
+  ui.cameraStatusText.textContent = message;
 }
-
-function setUploadStatus(message, condition = 'idle') {
-  elements.uploadStatus.dataset.state = condition;
-  elements.uploadStatus.textContent = message;
+function refreshCameraButtons() {
+  ui.start.hidden = state.running;
+  ui.start.disabled = state.starting;
+  ui.start.querySelector('span').textContent = state.starting ? 'Starting…' : 'Start camera';
+  ui.stop.hidden = !state.running;
+  if (!state.running) { ui.flip.hidden = true; ui.flash.hidden = true; }
 }
-
-async function loadQrScanner() {
-  if (!modulePromise) {
-    modulePromise = import(QR_LIBRARY_URL)
-      .then((module) => module.default)
-      .catch((error) => {
-        modulePromise = null; // Permit another attempt when the connection returns.
-        throw error;
-      });
-  }
-  return modulePromise;
-}
-
-function updateCameraControls() {
-  elements.startCamera.hidden = state.running;
-  elements.startCamera.disabled = state.starting;
-  elements.startCamera.textContent = state.starting ? 'Starting camera…' : 'Start camera';
-  if (!state.running && !state.starting) {
-    // Rebuild the button label after a loading state, including its SVG icon.
-    elements.startCamera.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg> Start camera';
-  }
-  elements.stopCamera.hidden = !state.running;
-  if (!state.running) {
-    elements.switchCamera.hidden = true;
-    elements.toggleFlash.hidden = true;
-    elements.toggleFlash.setAttribute('aria-pressed', 'false');
-    elements.flashLabel.textContent = 'Flash off';
-  }
-}
-
-function stopScanner(message = 'Camera stopped') {
-  state.cameraRequest += 1; // Invalidates any pending start operation.
+function stopScanner(message = 'Camera off') {
+  state.request++;
   state.running = false;
   state.starting = false;
+  state.zoomTrack = null;
+  state.zoomWanted = null;
+  ui.zoomContainer.hidden = true;
   if (state.scanner) state.scanner.stop();
-  elements.frame.classList.remove('is-live');
-  updateCameraControls();
-  setCameraStatus(message);
+  ui.frame.classList.remove('is-live');
+  ui.flash.setAttribute('aria-pressed', 'false');
+  ui.flash.setAttribute('aria-label', 'Turn flash on');
+  refreshCameraButtons();
+  status(message);
 }
-
-function clearUploadPreview() {
-  if (state.previewUrl) URL.revokeObjectURL(state.previewUrl);
-  state.previewUrl = null;
-  elements.imagePreview.removeAttribute('src');
-  elements.imagePreviewWrap.hidden = true;
-  elements.imageInput.value = '';
-}
-
-function selectView(view) {
-  if (view === 'result' && state.result === null) return;
-  if (view !== 'camera' && (state.running || state.starting)) stopScanner();
-  if (state.view === 'upload' && view !== 'upload') {
-    state.imageRequest += 1;
-    clearUploadPreview();
-    $('#choose-image').disabled = false;
-    $('#replace-image').disabled = false;
-    setUploadStatus('Your image stays on your device during scanning.');
-  }
-
-  state.view = view;
-  for (const [name, panel] of Object.entries(elements.panels)) panel.hidden = name !== view;
-  for (const button of elements.nav) {
-    const selected = button.dataset.view === view;
-    button.classList.toggle('is-active', selected);
-    button.setAttribute('aria-pressed', String(selected));
-    if (button.dataset.view === 'result') button.disabled = state.result === null;
-  }
-}
-
-function cameraErrorMessage(error) {
+function cameraError(error) {
+  if (error?.message === 'DECODER_UNAVAILABLE') return 'Scanner could not load. Check your internet connection.';
   switch (error?.name) {
-    case 'NotAllowedError':
-    case 'PermissionDeniedError':
-    case 'SecurityError': return 'Camera permission was denied. Allow camera access in browser settings, then try again.';
-    case 'NotFoundError':
-    case 'DevicesNotFoundError': return 'No camera was detected. You can still scan a saved image.';
-    case 'NotReadableError':
-    case 'TrackStartError': return 'The camera is busy or unavailable. Close other camera apps and try again.';
-    case 'OverconstrainedError': return 'Your device could not use the selected camera. Try again.';
-    default: return 'Could not start the camera. Check browser permissions and try again.';
+    case 'NotAllowedError': case 'PermissionDeniedError': case 'SecurityError': return 'Camera permission denied. Allow access in browser settings.';
+    case 'NotFoundError': case 'DevicesNotFoundError': return 'No camera found. Try scanning an image.';
+    case 'NotReadableError': case 'TrackStartError': return 'Camera is in use by another app.';
+    default: return 'Unable to start the camera. Try again.';
   }
 }
 
+function formatZoom(value) {
+  return `${Number(value).toFixed(1).replace(/\.0$/, '')}×`;
+}
+// The slider changes the actual media track. CSS scaling would only enlarge pixels.
+async function applyZoom() {
+  if (state.zoomApplying) return;
+  state.zoomApplying = true;
+  const track = state.zoomTrack;
+  try {
+    while (track && state.running && state.zoomTrack === track && state.zoomWanted != null) {
+      const target = state.zoomWanted;
+      state.zoomWanted = null;
+      try {
+        await track.applyConstraints({ advanced: [{ zoom: target }] });
+        if (state.zoomTrack === track) {
+          const actual = track.getSettings?.().zoom;
+          ui.zoomValue.textContent = formatZoom(Number.isFinite(actual) ? actual : target);
+        }
+      } catch {
+        if (state.zoomTrack === track) {
+          ui.zoomContainer.hidden = true;
+          toast('Camera zoom is not supported on this device.');
+        }
+        break;
+      }
+    }
+  } finally {
+    state.zoomApplying = false;
+    // A late slider input may have arrived just after the loop completed.
+    if (state.zoomWanted != null && state.running && state.zoomTrack) applyZoom();
+  }
+}
+async function configureZoom(request) {
+  const track = ui.video.srcObject?.getVideoTracks?.()[0];
+  state.zoomTrack = null;
+  state.zoomWanted = null;
+  ui.zoomContainer.hidden = true;
+  if (!track || !track.getCapabilities || !track.applyConstraints) return;
+  let range;
+  try { range = track.getCapabilities().zoom; } catch { return; }
+  if (!range || !Number.isFinite(range.min) || !Number.isFinite(range.max) || range.max <= range.min) return;
+  if (!state.running || request !== state.request) return;
+  const initialZoom = Math.min(range.max, Math.max(range.min, 1));
+  ui.zoom.min = String(range.min);
+  ui.zoom.max = String(range.max);
+  ui.zoom.step = 'any';
+  ui.zoom.value = String(initialZoom);
+  ui.zoomValue.textContent = formatZoom(initialZoom);
+  state.zoomTrack = track;
+  // Attempt to reset the actual camera to 1x on each start / camera switch.
+  try {
+    await track.applyConstraints({ advanced: [{ zoom: initialZoom }] });
+    if (!state.running || request !== state.request || state.zoomTrack !== track) return;
+    const actual = track.getSettings?.().zoom;
+    ui.zoomValue.textContent = formatZoom(Number.isFinite(actual) ? actual : initialZoom);
+    ui.zoomContainer.hidden = false;
+  } catch {
+    if (state.zoomTrack === track) state.zoomTrack = null;
+  }
+}
+
+async function refreshHardwareControls(request) {
+  try {
+    const supported = await state.scanner.hasFlash();
+    if (state.running && request === state.request) ui.flash.hidden = !supported;
+  } catch { ui.flash.hidden = true; }
+  try {
+    const QrScanner = await getDecoder();
+    const cameras = await QrScanner.listCameras();
+    if (state.running && request === state.request) ui.flip.hidden = cameras.length < 2;
+  } catch { ui.flip.hidden = true; }
+}
 async function startScanner() {
-  if (state.running || state.starting || state.view !== 'camera') return;
+  if (state.running || state.starting || !ui.resultView.hidden) return;
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
-    setCameraStatus('Camera needs a supported browser on HTTPS (or localhost). Upload an image instead.', 'error');
+    status('Camera requires HTTPS or localhost. You can still scan an image.', 'error');
     return;
   }
-
-  const request = ++state.cameraRequest;
+  const request = ++state.request;
   state.starting = true;
-  updateCameraControls();
-  setCameraStatus('Loading scanner and requesting camera access…');
-
+  refreshCameraButtons();
+  status('Requesting camera access…');
   try {
-    let QrScanner;
-    try { QrScanner = await loadQrScanner(); }
-    catch { throw new Error('DECODER_UNAVAILABLE'); }
-    if (request !== state.cameraRequest || state.view !== 'camera') return;
-
+    const QrScanner = await getDecoder().catch(() => { throw new Error('DECODER_UNAVAILABLE'); });
+    if (request !== state.request) return;
     if (!state.scanner) {
-      state.scanner = new QrScanner(elements.video, (result) => {
-        if (state.running && state.view === 'camera') {
-          showResult(result.data, 'camera');
-        }
+      state.scanner = new QrScanner(ui.video, result => {
+        if (state.running && ui.resultView.hidden) showResult(result.data);
       }, { preferredCamera: state.facing, returnDetailedScanResult: true, maxScansPerSecond: 12 });
     }
-
     await state.scanner.start();
-    if (request !== state.cameraRequest || state.view !== 'camera') {
-      state.scanner.stop();
-      return;
-    }
-
+    if (request !== state.request || !ui.resultView.hidden) { state.scanner.stop(); return; }
     state.running = true;
-    elements.frame.classList.add('is-live');
-    setCameraStatus('Camera is live. Hold a QR code inside the frame.', 'live');
-
-    // Both controls are optional: browsers are free not to support them.
-    try {
-      const canFlash = await state.scanner.hasFlash();
-      if (state.running && request === state.cameraRequest) {
-        elements.toggleFlash.hidden = !canFlash;
-      }
-    } catch { elements.toggleFlash.hidden = true; }
-    try {
-      const cameras = await QrScanner.listCameras();
-      if (state.running && request === state.cameraRequest) {
-        elements.switchCamera.hidden = cameras.length < 2;
-      }
-    } catch { elements.switchCamera.hidden = true; }
-  } catch (error) {
-    if (request === state.cameraRequest) {
-      stopScanner(error.message === 'DECODER_UNAVAILABLE'
-        ? 'Could not load the scanner library. Check your internet connection and try again.'
-        : cameraErrorMessage(error));
-      elements.cameraStatus.dataset.state = 'error';
+    ui.frame.classList.add('is-live');
+    status('Point your camera at a QR code', 'live');
+    await configureZoom(request);
+    if (request !== state.request) return;
+    await refreshHardwareControls(request);
+  } catch (err) {
+    if (request === state.request) {
+      const message = cameraError(err);
+      stopScanner(message);
+      ui.cameraStatus.dataset.state = 'error';
     }
   } finally {
-    if (request === state.cameraRequest) state.starting = false;
-    updateCameraControls();
+    if (request === state.request) state.starting = false;
+    refreshCameraButtons();
   }
 }
-
 async function flipCamera() {
   if (!state.running || !state.scanner) return;
+  ui.flip.disabled = true;
+  const request = state.request;
   const next = state.facing === 'environment' ? 'user' : 'environment';
-  elements.switchCamera.disabled = true;
   try {
+    state.zoomTrack = null;
+    ui.zoomContainer.hidden = true;
     await state.scanner.setCamera(next);
+    if (request !== state.request) return;
     state.facing = next;
-    setCameraStatus('Camera changed. Ready to scan.', 'live');
-    const hasFlash = await state.scanner.hasFlash();
-    elements.toggleFlash.hidden = !hasFlash;
-    elements.toggleFlash.setAttribute('aria-pressed', 'false');
-    elements.flashLabel.textContent = 'Flash off';
-  } catch {
-    setCameraStatus('Could not switch cameras. You can keep using the current camera.', 'live');
-  } finally {
-    elements.switchCamera.disabled = false;
-  }
+    await configureZoom(request);
+    await refreshHardwareControls(request);
+    ui.flash.setAttribute('aria-pressed', 'false');
+    ui.flash.setAttribute('aria-label', 'Turn flash on');
+  } catch { if (request === state.request) status('Could not switch camera', 'error'); }
+  finally { ui.flip.disabled = false; }
 }
-
 async function toggleFlash() {
-  if (!state.scanner || !state.running) return;
-  elements.toggleFlash.disabled = true;
+  if (!state.running || !state.scanner) return;
+  ui.flash.disabled = true;
   try {
     await state.scanner.toggleFlash();
     const on = state.scanner.isFlashOn();
-    elements.toggleFlash.setAttribute('aria-pressed', String(on));
-    elements.flashLabel.textContent = on ? 'Flash on' : 'Flash off';
-  } catch {
-    showToast('Flashlight is unavailable on this device.');
-  } finally {
-    elements.toggleFlash.disabled = false;
-  }
+    ui.flash.setAttribute('aria-pressed', String(on));
+    ui.flash.setAttribute('aria-label', on ? 'Turn flash off' : 'Turn flash on');
+  } catch { toast('Flash is not supported on this device.'); }
+  finally { ui.flash.disabled = false; }
 }
-
-function safeWebUrl(content) {
-  const value = content.trim();
+function webUrl(text) {
+  const value = text.trim();
   if (!/^https?:\/\//i.test(value)) return null;
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : null;
   } catch { return null; }
 }
-
-function showResult(content, source) {
-  if (typeof content !== 'string' || content.length === 0) return;
-  const webUrl = safeWebUrl(content);
-  state.result = content;
-  elements.resultText.textContent = content; // Never interpret scanned content as HTML.
-  elements.resultType.textContent = webUrl ? 'Website URL' : 'Text / other data';
-  elements.resultSource.textContent = source === 'camera' ? 'Scanned with camera' : 'Scanned from image';
-  elements.resultWarning.textContent = webUrl
-    ? 'Check the website address carefully before opening unfamiliar links.'
-    : 'QR codes can contain messages, contact details or other text. Review the content before using it.';
-  elements.openLink.hidden = !webUrl;
-  if (webUrl) elements.openLink.href = webUrl;
-  else elements.openLink.removeAttribute('href');
-  selectView('result');
+function showResult(text) {
+  if (typeof text !== 'string' || !text.length) return;
+  state.result = text;
+  const url = webUrl(text);
+  stopScanner();
+  ui.resultText.textContent = text; // Scanned data is never interpreted as HTML.
+  ui.open.hidden = !url;
+  ui.copy.hidden = !!url;
+  if (url) ui.open.href = url; else ui.open.removeAttribute('href');
+  ui.scannerView.hidden = true;
+  ui.resultView.hidden = false;
   $('#result-title').focus({ preventScroll: true });
 }
-
-async function processImage(file) {
+async function scanImage(file) {
   if (!file) return;
-  const supportedImage = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|avif|heic|heif)$/i.test(file.name);
-  if (!supportedImage) {
-    setUploadStatus('Please select an image file, such as a PNG or JPG.', 'error');
-    return;
-  }
-  if (file.size > MAX_UPLOAD_BYTES) {
-    setUploadStatus('Image is over 15 MB. Please choose a smaller file.', 'error');
-    return;
-  }
-
   const request = ++state.imageRequest;
-  clearUploadPreview();
-  if (file.type && file.type !== 'image/svg+xml') {
-    state.previewUrl = URL.createObjectURL(file);
-    elements.imagePreview.src = state.previewUrl;
-    elements.imagePreviewWrap.hidden = false;
+  if (!file.type.startsWith('image/') && !/\.(png|jpe?g|webp|gif|bmp|avif|heic|heif)$/i.test(file.name)) {
+    status('Please choose a QR code image.', 'error'); return;
   }
-  setUploadStatus(`Scanning ${file.name}…`);
-  $('#choose-image').disabled = true;
-  $('#replace-image').disabled = true;
-
+  if (file.size > MAX_UPLOAD_BYTES) { status('Image must be smaller than 15 MB.', 'error'); return; }
+  if (state.running || state.starting) stopScanner();
+  ui.chooseImage.disabled = true;
+  status('Scanning image…');
   try {
-    let QrScanner;
-    try { QrScanner = await loadQrScanner(); }
-    catch { throw new Error('DECODER_UNAVAILABLE'); }
-    if (request !== state.imageRequest || state.view !== 'upload') return;
+    const QrScanner = await getDecoder().catch(() => { throw new Error('DECODER_UNAVAILABLE'); });
+    if (request !== state.imageRequest) return;
     const result = await QrScanner.scanImage(file, { returnDetailedScanResult: true });
-    if (request !== state.imageRequest || state.view !== 'upload') return;
-    showResult(result.data, 'upload');
-  } catch (error) {
-    if (request !== state.imageRequest || state.view !== 'upload') return;
-    if (error.message === 'DECODER_UNAVAILABLE') {
-      setUploadStatus('Could not load the scanner library. Check your internet connection and try again.', 'error');
-    } else {
-      setUploadStatus('No readable QR code found. Try a clearer picture with the full code visible.', 'error');
-    }
+    if (request === state.imageRequest) showResult(result.data);
+  } catch (err) {
+    if (request === state.imageRequest) status(err.message === 'DECODER_UNAVAILABLE' ? 'Scanner could not load. Check your connection.' : 'No QR code found. Try a clearer image.', 'error');
   } finally {
-    if (request === state.imageRequest) {
-      $('#choose-image').disabled = false;
-      $('#replace-image').disabled = false;
-    }
+    ui.imageInput.value = '';
+    ui.chooseImage.disabled = false;
   }
 }
-
-async function copyResult() {
-  if (state.result === null) return;
+async function copyText() {
   try {
-    if (navigator.clipboard?.writeText && window.isSecureContext) {
-      await navigator.clipboard.writeText(state.result);
-    } else {
-      // Fallback for older mobile browsers without the Clipboard API.
-      const input = document.createElement('textarea');
-      input.value = state.result;
-      input.style.position = 'fixed';
-      input.style.opacity = '0';
-      document.body.appendChild(input);
-      input.select();
-      const copied = document.execCommand('copy');
-      input.remove();
-      if (!copied) throw new Error('Copy failed');
+    if (navigator.clipboard?.writeText && window.isSecureContext) await navigator.clipboard.writeText(state.result);
+    else {
+      const field = document.createElement('textarea');
+      field.value = state.result;
+      field.style.position = 'fixed'; field.style.opacity = '0';
+      document.body.appendChild(field);
+      field.select();
+      if (!document.execCommand('copy')) throw new Error('Unable to copy');
+      field.remove();
     }
-    showToast('Copied to clipboard');
-  } catch {
-    showToast('Copy unavailable. Select the result text to copy it.');
-  }
+    toast('Copied');
+  } catch { toast('Copy failed. Select the text to copy it.'); }
 }
 
-// UI wiring
-for (const button of elements.nav) button.addEventListener('click', () => selectView(button.dataset.view));
-elements.startCamera.addEventListener('click', startScanner);
-elements.stopCamera.addEventListener('click', () => stopScanner());
-elements.switchCamera.addEventListener('click', flipCamera);
-elements.toggleFlash.addEventListener('click', toggleFlash);
-$('#choose-image').addEventListener('click', () => elements.imageInput.click());
-$('#replace-image').addEventListener('click', () => elements.imageInput.click());
-elements.imageInput.addEventListener('change', () => processImage(elements.imageInput.files?.[0]));
-$('#copy-result').addEventListener('click', copyResult);
-$('#scan-again').addEventListener('click', () => { selectView('camera'); startScanner(); });
-$('#upload-another').addEventListener('click', () => selectView('upload'));
-
-for (const name of ['dragenter', 'dragover']) {
-  elements.dropzone.addEventListener(name, (event) => {
-    event.preventDefault();
-    if (state.view === 'upload') elements.dropzone.classList.add('is-dragging');
-  });
-}
-for (const name of ['dragleave', 'drop']) {
-  elements.dropzone.addEventListener(name, (event) => {
-    event.preventDefault();
-    elements.dropzone.classList.remove('is-dragging');
-  });
-}
-elements.dropzone.addEventListener('drop', (event) => {
-  if (state.view === 'upload') processImage(event.dataTransfer?.files?.[0]);
+ui.start.addEventListener('click', startScanner);
+ui.stop.addEventListener('click', () => stopScanner());
+ui.flip.addEventListener('click', flipCamera);
+ui.flash.addEventListener('click', toggleFlash);
+ui.zoom.addEventListener('input', () => {
+  if (!state.zoomTrack || !state.running) return;
+  const target = Number(ui.zoom.value);
+  if (!Number.isFinite(target)) return;
+  ui.zoomValue.textContent = formatZoom(target);
+  state.zoomWanted = target;
+  applyZoom();
 });
-
+ui.chooseImage.addEventListener('click', () => ui.imageInput.click());
+ui.imageInput.addEventListener('change', () => scanImage(ui.imageInput.files?.[0]));
+ui.copy.addEventListener('click', copyText);
+ui.again.addEventListener('click', () => {
+  state.result = null;
+  ui.resultView.hidden = true;
+  ui.scannerView.hidden = false;
+  startScanner();
+});
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && (state.running || state.starting)) {
-    stopScanner('Camera paused because the page went into the background. Tap Start camera to resume.');
-  }
+  if (document.hidden && (state.running || state.starting)) stopScanner('Camera paused. Tap Start camera to resume.');
 });
-window.addEventListener('pagehide', () => {
-  if (state.scanner) state.scanner.destroy();
-  state.scanner = null;
-  clearUploadPreview();
-});
-
-updateCameraControls();
-selectView('camera');
+window.addEventListener('pagehide', () => { if (state.scanner) state.scanner.destroy(); state.scanner = null; });
+refreshCameraButtons();
