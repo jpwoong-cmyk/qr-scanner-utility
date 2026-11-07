@@ -15,7 +15,7 @@ const ui = {
   resultText: $('#result-text'), open: $('#open-link'), copy: $('#copy-text'), again: $('#scan-again'),
   toast: $('#toast'),
   consent: $('#permission-dialog'), consentTitle: $('#permission-title'),
-  consentDetail: $('#permission-detail'), consentConfirm: $('#confirm-permission'),
+  consentMessage: $('#permission-message'), consentConfirm: $('#confirm-permission'),
   consentCancel: $('#cancel-permission'), linkCaution: $('#link-caution'),
 };
 const state = {
@@ -42,7 +42,7 @@ function status(message, kind = 'idle') {
 function refreshCameraButtons() {
   ui.start.hidden = state.running;
   ui.start.disabled = state.starting;
-  ui.start.querySelector('span').textContent = state.starting ? 'Starting…' : 'Start camera';
+  ui.start.querySelector('span').textContent = state.starting ? 'Starting…' : 'Scan QR';
   ui.stop.hidden = !state.running;
   if (!state.running) { ui.flip.hidden = true; ui.flash.hidden = true; }
 }
@@ -312,11 +312,17 @@ async function copyText() {
 function askConsent(action) {
   if (ui.consent.open || state.starting) return;
   state.consentAction = action;
-  ui.consentTitle.textContent = action === 'camera' ? 'Camera access' : 'Document access';
-  ui.consentDetail.textContent = action === 'camera'
-    ? 'Camera will switch off after a scan or when you leave. Your browser may remember its own permission; change that in Site settings.'
-    : 'Only the image you choose will be read on this device. No document library or folder access is granted.';
-  ui.consentConfirm.textContent = action === 'camera' ? 'Allow this time' : 'Choose document';
+  if (action === 'camera') {
+    ui.consentTitle.textContent = 'Use camera?';
+    ui.consentMessage.textContent = 'Paiseh ah, need your permission first.';
+    ui.consentCancel.textContent = 'Not now';
+    ui.consentConfirm.textContent = 'Ok can';
+  } else {
+    ui.consentTitle.textContent = 'Want upload ah?';
+    ui.consentMessage.textContent = 'Ok loh, choose image from documents.';
+    ui.consentCancel.textContent = "Don't want";
+    ui.consentConfirm.textContent = 'Ok Choose';
+  }
   ui.consent.showModal();
   ui.consentCancel.focus();
 }

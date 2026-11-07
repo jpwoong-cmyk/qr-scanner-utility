@@ -4,9 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f8fc">
-  <meta name="description" content="Scanme-QR scans QR codes using your camera or a document image.">
-  <title>Scanme-QR</title>
-  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="description" content="SCANme-QR. Scan a QR code or upload an image.">
+  <title>SCANme-QR</title>
+  <link rel="icon" href="J_logo_icon.png" type="image/png">
+  <link rel="apple-touch-icon" href="J_logo_icon.png">
   <link rel="stylesheet" href="style.css">
   <script type="module" src="app.js"></script>
 </head>
@@ -26,8 +27,8 @@
 
   <div class="app-shell">
     <header class="topbar">
-      <span class="brand-icon" aria-hidden="true"><svg class="icon"><use href="#i-qr"/></svg></span>
-      <strong>Scanme-QR</strong>
+      <span class="brand-icon" aria-hidden="true"><img src="J_logo.png" alt="" width="118" height="47"></span>
+      <strong>SCANme-QR</strong>
     </header>
 
     <main>
@@ -36,7 +37,6 @@
           <video id="camera-video" autoplay muted playsinline aria-label="Live camera preview"></video>
           <div class="camera-placeholder" id="camera-placeholder">
             <svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg>
-            <span>Camera is off</span>
           </div>
           <div class="scan-guide" aria-hidden="true"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span></div>
           <div class="zoom-control" id="zoom-control" hidden>
@@ -47,7 +47,7 @@
         </div>
         <p class="status-line" id="camera-status" role="status" aria-live="polite"><span class="status-dot"></span><span id="camera-status-text">Camera off</span></p>
         <div class="camera-actions">
-          <button class="btn btn-primary" id="start-camera" type="button"><svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg><span>Start camera</span></button>
+          <button class="btn btn-primary" id="start-camera" type="button"><svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg><span>Scan QR</span></button>
           <button class="btn btn-secondary" id="stop-camera" type="button" hidden><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg><span>Stop</span></button>
           <button class="btn btn-secondary btn-square" id="switch-camera" type="button" aria-label="Flip camera" title="Flip camera" hidden><svg class="icon" aria-hidden="true"><use href="#i-flip"/></svg></button>
           <button class="btn btn-secondary btn-square" id="toggle-flash" type="button" aria-label="Turn flash on" title="Flash" aria-pressed="false" hidden><svg class="icon" aria-hidden="true"><use href="#i-flash"/></svg></button>
@@ -60,9 +60,9 @@
 
       <section class="result-view" id="result-view" aria-labelledby="result-title" hidden>
         <span class="result-success" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span>
-        <h1 id="result-title" tabindex="-1">QR code scanned</h1>
+        <h1 id="result-title" tabindex="-1">Result</h1>
         <div class="result-content" id="result-text" aria-label="Decoded QR content"></div>
-        <p class="link-caution" id="link-caution" hidden>Check the link before you open it.</p>
+        <p class="link-caution" id="link-caution" hidden>Check the link first.</p>
         <div class="result-actions">
           <a class="btn btn-primary" id="open-link" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden><svg class="icon" aria-hidden="true"><use href="#i-external"/></svg> Open</a>
           <button class="btn btn-primary" id="copy-text" type="button" hidden><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg> Copy text</button>
@@ -71,15 +71,14 @@
       </section>
     </main>
   </div>
-  <dialog class="permission-dialog" id="permission-dialog" aria-labelledby="permission-title" aria-describedby="permission-message permission-detail">
+  <dialog class="permission-dialog" id="permission-dialog" aria-labelledby="permission-title" aria-describedby="permission-message">
     <div class="permission-inner">
-      <span class="permission-mark" aria-hidden="true"><svg class="icon"><use href="#i-qr"/></svg></span>
-      <h2 id="permission-title">Permission first, can?</h2>
-      <p id="permission-message">Paiseh ah, need ask you permission again. Don't want later your phone open access to Scanme-QR</p>
-      <p id="permission-detail" class="permission-detail"></p>
+      <span class="permission-mark" aria-hidden="true"><img src="J_logo_icon.png" alt="" width="48" height="48"></span>
+      <h2 id="permission-title">Use camera?</h2>
+      <p id="permission-message">Paiseh ah, need your permission first.</p>
       <div class="permission-actions">
         <button class="btn btn-secondary" id="cancel-permission" type="button">Not now</button>
-        <button class="btn btn-primary" id="confirm-permission" type="button">Allow this time</button>
+        <button class="btn btn-primary" id="confirm-permission" type="button">Ok can</button>
       </div>
     </div>
   </dialog>

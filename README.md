@@ -1,37 +1,31 @@
-# Scanme-QR v3
+# SCANme-QR v4
 
-Simple browser-based QR scanner using HTML, CSS and JavaScript. Works on HTTPS Vercel sites. This update is based on the working QR Scanner v2 project.
+Mobile-first QR scanner in plain HTML, CSS, and JavaScript, ready for GitHub + Vercel. This is an update to the working v3 scanner; no framework, backend, npm, or API key is required.
 
-## Usage
+## What's new
 
-1. Tap **Start camera**, read the Singlish confirmation, then choose **Allow this time**. Your browser may also show its camera permission prompt.
-2. Scan a QR code. The camera stops and the decoded value appears. **Open** is displayed only for HTTP/HTTPS URLs. Other content gets **Copy text**.
-3. Tap **Scan again** to return to the idle scanner. Scanme-QR **does not reopen the camera automatically**. A new tap opens the confirmation again.
-4. To scan from a file, choose **Upload from documents**, accept the same confirmation, then select an image from your device.
+- Brand header now says **SCANme-QR** and uses the supplied **J logo** in a charcoal badge.
+- Browser favicon and iPhone home-screen icon use a square icon adapted from the same logo. The original logo artwork itself has not been redrawn.
+- Shorter Singlish confirmations:
+  - Camera: **Use camera?** / **Paiseh ah, need your permission first.** / **Not now** and **Ok can**.
+  - Documents: **Want upload ah?** / **Ok loh, choose image from documents.** / **Don't want** and **Ok Choose**.
+- Cleaner scanner with **Scan QR**, **Upload from documents**, and a simple **Result** view.
 
-## How permission works (important)
+## Run and deploy
 
-Scanme-QR itself asks you to confirm **on every scan session or document selection**. After scanning, stopping, tab hiding or leaving, it stops the camera stream. File access is limited to the file you choose with the browser's picker, without folder or library privileges.
+Upload the contents of this folder to the root of your existing GitHub repository. Include all image assets, the updated `index.html`, `style.css`, `app.js`, and `vercel.json`. If Vercel is connected to GitHub, it will deploy after you push. Open the HTTPS URL on your phone and verify both flows.
 
-**A website cannot force Chrome/Safari to forget a previously granted camera permission** or guarantee a fresh *browser-level* permission prompt every time. On mobile, choose your browser's **Allow this time** option when offered, or clear the site's saved camera permission in browser Site settings if you previously allowed persistent access. Our in-app prompt appears regardless.
+The `sample-qr.png` file lets you test **Upload from documents**.
 
-## File and link safeguards
+## Security and permissions
 
-- Select a single image, not a directory. Only PNG, JPG/JPEG, or WebP files are accepted. File content signatures are checked, not merely file extensions.
-- Images are limited to 10 MiB and (where `createImageBitmap` is supported) 40 megapixels.
-- Decoding happens in the browser. There is **no server upload code**, account, database, persistent scan log, or local storage.
-- Decoded values are inserted using `textContent`, never rendered as HTML. Only HTTP/HTTPS URLs without embedded usernames/passwords get an Open button. The destination isn't opened automatically.
-- HTTPS and a security-headers policy are configured in `vercel.json`, including Content Security Policy, no microphone permission, no framing, and no referrer leaking from Open links.
-- The QR decoding library `qr-scanner@1.4.2` is fetched as a pinned-version module from jsDelivr only when needed and remains a third-party runtime dependency. That CDN is allowed by the Content Security Policy. An offline/local vendored dependency would further reduce that trust boundary.
+- SCANme-QR asks for **in-app confirmation every time** before starting camera or opening the file picker. It does not request directory or library access.
+- A website **cannot force the browser to revoke an already-saved camera permission** or show a fresh native permission dialog on every attempt. Choose your browser's temporary permission option, if available, or clear saved permissions in site settings.
+- When scanning stops, finishes, tab is hidden, or page is closed, the camera stream is released. **Scan again** does not automatically restart the camera.
+- Selected images are checked for PNG/JPEG/WebP file signatures and are limited to 10 MiB. Resolution is also checked where supported.
+- Scanned content is displayed as text, never HTML. Only HTTP/HTTPS links without embedded credentials receive an **Open** button; nothing auto-opens. Read the destination before visiting.
+- QR decoding happens locally in the browser using the version-pinned `qr-scanner@1.4.2` decoder loaded from jsDelivr when required. This is a third-party network dependency, but QR content and image files are not sent to an application server by our code.
+- `vercel.json` retains CSP, frame restrictions, referrer policy, and limited permissions.
+- The camera's physical 1× zoom starts at 1× or the closest available setting, and the zoom slider only appears when supported. Preview uses `object-fit: contain` to avoid cropping.
 
-## Deploy to GitHub + Vercel
-
-1. Replace the existing repo files (`index.html`, `style.css`, `app.js`, `vercel.json`, `README.md`; favicon and sample QR are included).
-2. Push to the main branch; Vercel redeploys automatically if connected.
-3. Open your HTTPS URL, test the camera consent with your phone, then upload `sample-qr.png` to test image decoding.
-
-No Node.js, npm, build configuration, app installation, or backend is needed.
-
-## Note about 1× zoom
-
-The preview still uses `object-fit: contain`. On compatible devices the physical-camera zoom slider starts at 1× (or the nearest supported zoom). Some phone browsers don't expose camera zoom. It is not necessarily the same field of view as the phone's own camera app.
+Files: `index.html`, `style.css`, `app.js`, `J_logo.png`, `J_logo_icon.png`, `vercel.json`, `sample-qr.png`, `README.md`.

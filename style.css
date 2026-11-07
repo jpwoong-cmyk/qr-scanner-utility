@@ -18,15 +18,16 @@ button:disabled { cursor: wait; opacity: .7; }
 .svg-sprite, .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .icon { display: inline-block; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; flex: none; }
 .app-shell { width: min(100% - 32px, 530px); margin: 0 auto; padding: 16px 0 32px; }
-.topbar { display: flex; align-items: center; gap: 11px; min-height: 64px; margin-bottom: 12px; }
-.topbar strong { font-size: 19px; letter-spacing: -.45px; }
-.brand-icon { display: grid; place-items: center; width: 38px; height: 38px; color: white; border-radius: 9px; background: var(--blue); }
-.brand-icon .icon { width: 23px; height: 23px; }
+.topbar { display: flex; align-items: center; gap: 12px; min-height: 66px; margin-bottom: 10px; }
+.topbar strong { font-size: 20px; letter-spacing: -.5px; white-space: nowrap; }
+/* The original transparent J logo has silver artwork: charcoal makes it legible. */
+.brand-icon { display: grid; place-items: center; width: 128px; height: 54px; padding: 5px; flex: none; overflow: hidden; border-radius: 10px; background: #111924; border: 1px solid #283444; }
+.brand-icon img { display: block; width: 100%; max-width: 118px; height: 100%; object-fit: contain; }
 main { background: white; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 4px 20px rgba(28,52,91,.035); padding: 17px; }
 .camera-frame { position: relative; overflow: hidden; isolation: isolate; display: grid; place-items: center; width: 100%; aspect-ratio: 1 / 1; max-height: min(53dvh, 450px); background: #101b2b; border-radius: 9px; }
 .camera-frame video { position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: contain; opacity: 0; }
 .camera-frame.is-live video { opacity: 1; }
-.camera-placeholder { display: flex; align-items: center; flex-direction: column; gap: 10px; color: #d5dfeb; font-size: 13px; }
+.camera-placeholder { display: flex; align-items: center; flex-direction: column; color: #d5dfeb; }
 .camera-placeholder .icon { width: 35px; height: 35px; color: #97abc3; }
 .camera-frame.is-live .camera-placeholder { display: none; }
 .scan-guide { display: none; pointer-events: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(66%, 220px); aspect-ratio: 1; }
@@ -66,19 +67,25 @@ main { background: white; border: 1px solid var(--line); border-radius: 14px; bo
 .result-actions { margin-top: 19px; }
 .result-actions > * { flex: 1; }
 .toast { position: fixed; left: 50%; bottom: max(22px, env(safe-area-inset-bottom)); transform: translateX(-50%); border-radius: 8px; background: #243951; color: #fff; padding: 12px 17px; font-size: 13px; max-width: calc(100vw - 30px); text-align: center; box-shadow: 0 12px 24px rgba(0,0,0,.15); }
-@media (max-width: 420px) { .app-shell { width: calc(100% - 20px); padding-top: 7px; } .topbar { min-height: 60px; } main { padding: 10px; border-radius: 12px; } .camera-frame { max-height: 51dvh; } .result-view { padding: 25px 7px 17px; } }
+@media (max-width: 420px) { .app-shell { width: calc(100% - 20px); padding-top: 7px; } .topbar { min-height: 62px; } main { padding: 10px; border-radius: 12px; } .camera-frame { max-height: 51dvh; } .result-view { padding: 25px 7px 17px; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
 /* One-action-at-a-time consent. Native dialog traps focus and supports Escape. */
 .permission-dialog { position: fixed; width: min(calc(100vw - 32px), 420px); max-height: min(86dvh, 680px); margin: auto; padding: 0; border: 1px solid #dce4ef; border-radius: 14px; color: var(--text); background: #fff; box-shadow: 0 24px 80px rgba(8,24,46,.27); overflow: auto; }
 .permission-dialog::backdrop { background: rgba(13, 28, 47, .62); }
-.permission-inner { padding: 25px 23px 22px; }
-.permission-mark { display: grid; place-items: center; width: 42px; height: 42px; color: #2563eb; background: #eaf1ff; border-radius: 10px; margin-bottom: 15px; }
-.permission-mark .icon { width: 24px; height: 24px; }
+.permission-inner { padding: 22px 22px 20px; }
+/* Brand mark is from J_logo.png, not the generic QR icon. */
+.permission-mark { display: grid; place-items: center; width: 51px; height: 51px; border-radius: 11px; margin-bottom: 14px; background: #111924; overflow: hidden; }
+.permission-mark img { width: 48px; height: 48px; object-fit: contain; }
 .permission-dialog h2 { font-size: 20px; margin: 0 0 10px; letter-spacing: -.3px; }
-#permission-message { font-size: 15px; line-height: 1.55; margin: 0 0 12px; }
-.permission-detail { font-size: 12px; line-height: 1.55; color: var(--muted); margin: 0 0 22px; }
+#permission-message { font-size: 15px; line-height: 1.5; margin: 0 0 21px; color: #56657a; }
 .permission-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .permission-actions .btn { width: 100%; }
 .link-caution { color: #86520b; font-size: 12px; margin: 12px 0 0; }
 @media (max-width: 360px) { .permission-inner { padding: 20px 16px; } .permission-actions { grid-template-columns: 1fr; } }
+
+@media (max-width: 350px) {
+  .topbar { gap: 9px; }
+  .brand-icon { width: 101px; height: 49px; padding: 4px; }
+  .topbar strong { font-size: 18px; }
+}
