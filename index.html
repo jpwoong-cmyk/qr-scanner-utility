@@ -57,11 +57,17 @@
             </div>
           </div>
 
-          <div class="scan-guide" aria-hidden="true"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span></div>
+          <div class="scan-guide" aria-hidden="true"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span><span class="scan-beam"></span></div>
+          <canvas id="freeze-frame" class="freeze-frame" aria-hidden="true" hidden></canvas>
+          <div class="scan-transition" id="scan-transition" role="status" aria-live="polite" hidden>
+            <span class="check-pulse" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span>
+            <strong>Checking link…</strong>
+            <span class="check-progress" aria-hidden="true"><span></span></span>
+          </div>
 
           <div class="zoom-control" id="zoom-control" hidden>
-            <output id="zoom-value" for="zoom-slider">1×</output>
-            <input type="range" id="zoom-slider" min="1" max="5" step="any" value="1" aria-label="Camera zoom">
+            <output id="zoom-value" for="zoom-slider">0</output>
+            <input type="range" id="zoom-slider" min="0" max="100" step="1" value="0" aria-label="Extra camera zoom" aria-valuetext="0 extra zoom">
             <span class="zoom-caption">ZOOM</span>
           </div>
           <div class="live-controls" id="live-controls" hidden>
@@ -76,12 +82,24 @@
       </section>
 
       <section class="result-view" id="result-view" aria-labelledby="result-title" hidden>
-        <span class="result-success" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span>
-        <h1 id="result-title" tabindex="-1">Result</h1>
+        <span class="result-success" aria-hidden="true"><svg class="mouse-smile" viewBox="0 0 112 112" role="img">
+          <circle cx="29" cy="33" r="19" fill="#becbd7" stroke="#526476" stroke-width="3"/>
+          <circle cx="83" cy="33" r="19" fill="#becbd7" stroke="#526476" stroke-width="3"/>
+          <circle cx="29" cy="33" r="12" fill="#efc5ce"/>
+          <circle cx="83" cy="33" r="12" fill="#efc5ce"/>
+          <path d="M56 30c-26 0-41 18-41 41 0 21 19 35 41 35s41-14 41-35c0-23-15-41-41-41Z" fill="#e5ebf2" stroke="#526476" stroke-width="3"/>
+          <circle cx="41" cy="67" r="4" fill="#273b50"/><circle cx="71" cy="67" r="4" fill="#273b50"/>
+          <path d="M50 79q6-6 12 0l-6 5Z" fill="#c27b8a"/>
+          <path d="M46 88q10 12 20 0" fill="none" stroke="#526476" stroke-width="3" stroke-linecap="round"/>
+          <path d="M28 80 10 77m18 9-18 3m74-9 18-3m-18 9 18 3" stroke="#708295" stroke-width="2" stroke-linecap="round"/>
+        </svg></span>
+        <h1 id="result-title" tabindex="-1">Ok done. Open?</h1>
+        <p class="security-pill" id="security-pill" hidden></p>
         <div class="result-content" id="result-text" aria-label="Decoded QR content"></div>
-        <p class="link-caution" id="link-caution" hidden>Check the link first.</p>
+        <p class="link-caution" id="link-caution" hidden></p>
         <div class="result-actions">
           <a class="btn btn-primary" id="open-link" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden><svg class="icon" aria-hidden="true"><use href="#i-external"/></svg>Open</a>
+          <button class="btn btn-primary" id="review-link" type="button" hidden>Review link</button>
           <button class="btn btn-primary" id="copy-text" type="button" hidden><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>Copy text</button>
           <button class="btn btn-secondary" id="scan-again" type="button"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg>Scan again</button>
         </div>
@@ -107,6 +125,18 @@
       <h2 id="shortcut-title">Put me on Home Screen?</h2>
       <p id="shortcut-message">Open your browser menu and choose Add to Home screen.</p>
       <button class="btn btn-primary" id="close-shortcut" type="button">Ok steady</button>
+    </div>
+  </dialog>
+
+  <dialog class="shortcut-dialog risk-dialog" id="risk-dialog" aria-labelledby="risk-title" aria-describedby="risk-message">
+    <div class="shortcut-inner">
+      <div class="risk-icon" aria-hidden="true">!</div>
+      <h2 id="risk-title">Open anyway ah?</h2>
+      <p id="risk-message"></p>
+      <div class="permission-actions">
+        <button class="btn btn-secondary" id="risk-cancel" type="button">Don't open</button>
+        <a class="btn btn-primary" id="risk-open" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Open anyway</a>
+      </div>
     </div>
   </dialog>
 

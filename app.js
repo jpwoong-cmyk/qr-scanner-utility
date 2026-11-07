@@ -1,4 +1,5 @@
-// Browser-only QR scanner. Reuses Phase 1's decoder, camera/flash and image upload.
+// SCANme-QR. Only QR decoding happens in the camera; links are audited locally before result display.
+import { auditQrText } from './security/url-audit.js';
 const QR_LIBRARY_URL = 'https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js';
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_PIXELS = 40_000_000;
@@ -19,11 +20,15 @@ const ui = {
   consent: $('#permission-dialog'), consentTitle: $('#permission-title'),
   consentMessage: $('#permission-message'), consentConfirm: $('#confirm-permission'),
   consentCancel: $('#cancel-permission'), linkCaution: $('#link-caution'),
+  securityPill: $('#security-pill'), reviewLink: $('#review-link'),
+  riskDialog: $('#risk-dialog'), riskMessage: $('#risk-message'), riskOpen: $('#risk-open'),
+  riskCancel: $('#risk-cancel'), freeze: $('#freeze-frame'), transition: $('#scan-transition'),
 };
 const state = {
   scanner: null, running: false, starting: false, facing: 'environment',
   request: 0, imageRequest: 0, zoomTrack: null, zoomWanted: null,
-  zoomApplying: false, result: null, toastTimer: null, consentAction: null,
+  zoomApplying: false, zoomRange: null, result: null, toastTimer: null, consentAction: null,
+  processing: false, flow: 0, audit: null,
 };
 let decoderPromise = null;
 
@@ -43,10 +48,10 @@ function status(message, kind = 'idle') {
   ui.cameraStatus.hidden = (kind === 'idle' && message === 'Camera off');
 }
 function refreshCameraButtons() {
-  ui.start.hidden = state.running;
+  ui.start.hidden = state.running || state.processing;
   ui.start.disabled = state.starting;
   ui.start.querySelector('span').textContent = state.starting ? 'Opening…' : 'Tap to Scan';
-  ui.liveControls.hidden = !state.running;
+  ui.liveControls.hidden = !state.running || state.processing;
   document.body.classList.toggle('is-scanning', state.running);
   if (!state.running) { ui.flip.hidden = true; ui.flash.hidden = true; }
 }
@@ -55,6 +60,7 @@ function stopScanner(message = 'Camera off') {
   state.running = false;
   state.starting = false;
   state.zoomTrack = null;
+  state.zoomRange = null;
   state.zoomWanted = null;
   ui.zoomContainer.hidden = true;
   if (state.scanner) state.scanner.stop();
@@ -78,41 +84,44 @@ function cameraError(error) {
   }
 }
 
-function formatZoom(value) {
-  return `${Number(value).toFixed(1).replace(/\.0$/, '')}×`;
+// UI "0" means zero added digital zoom. The camera's true minimum can be
+// 0.5x, 1x or higher depending on lens/OS, never literal 0x optics.
+function zoomLabel(actual, min) {
+  const extra = Math.max(0, actual - min);
+  return extra < 0.05 ? '0' : `+${extra.toFixed(1).replace(/\.0$/, '')}×`;
 }
-// The slider changes the actual media track. CSS scaling would only enlarge pixels.
 async function applyZoom() {
   if (state.zoomApplying) return;
   state.zoomApplying = true;
   const track = state.zoomTrack;
   try {
-    while (track && state.running && state.zoomTrack === track && state.zoomWanted != null) {
+    while (track && state.running && state.zoomTrack === track && state.zoomWanted !== null) {
       const target = state.zoomWanted;
       state.zoomWanted = null;
       try {
         await track.applyConstraints({ advanced: [{ zoom: target }] });
         if (state.zoomTrack === track) {
           const actual = track.getSettings?.().zoom;
-          ui.zoomValue.textContent = formatZoom(Number.isFinite(actual) ? actual : target);
+          ui.zoomValue.textContent = zoomLabel(Number.isFinite(actual) ? actual : target, state.zoomRange.min);
         }
       } catch {
         if (state.zoomTrack === track) {
           ui.zoomContainer.hidden = true;
-          toast('Camera zoom is not supported on this device.');
+          toast('Zoom unavailable on this camera.');
+          state.zoomWanted = null;
         }
         break;
       }
     }
   } finally {
     state.zoomApplying = false;
-    // A late slider input may have arrived just after the loop completed.
-    if (state.zoomWanted != null && state.running && state.zoomTrack) applyZoom();
+    if (state.zoomWanted !== null && state.running && state.zoomTrack) applyZoom();
   }
 }
 async function configureZoom(request) {
   const track = ui.video.srcObject?.getVideoTracks?.()[0];
   state.zoomTrack = null;
+  state.zoomRange = null;
   state.zoomWanted = null;
   ui.zoomContainer.hidden = true;
   if (!track || !track.getCapabilities || !track.applyConstraints) return;
@@ -120,23 +129,17 @@ async function configureZoom(request) {
   try { range = track.getCapabilities().zoom; } catch { return; }
   if (!range || !Number.isFinite(range.min) || !Number.isFinite(range.max) || range.max <= range.min) return;
   if (!state.running || request !== state.request) return;
-  const initialZoom = Math.min(range.max, Math.max(range.min, 1));
-  ui.zoom.min = String(range.min);
-  ui.zoom.max = String(range.max);
-  ui.zoom.step = 'any';
-  ui.zoom.value = String(initialZoom);
-  ui.zoomValue.textContent = formatZoom(initialZoom);
+  ui.zoom.min = '0'; ui.zoom.max = '100'; ui.zoom.step = '1'; ui.zoom.value = '0';
+  ui.zoomValue.textContent = '0';
+  ui.zoom.setAttribute('aria-valuetext', '0 extra zoom');
   state.zoomTrack = track;
-  // Attempt to reset the actual camera to 1x on each start / camera switch.
+  state.zoomRange = { min: range.min, max: range.max };
   try {
-    await track.applyConstraints({ advanced: [{ zoom: initialZoom }] });
+    // Prefer widest lens range made available by this browser camera track.
+    await track.applyConstraints({ advanced: [{ zoom: range.min }] });
     if (!state.running || request !== state.request || state.zoomTrack !== track) return;
-    const actual = track.getSettings?.().zoom;
-    ui.zoomValue.textContent = formatZoom(Number.isFinite(actual) ? actual : initialZoom);
     ui.zoomContainer.hidden = false;
-  } catch {
-    if (state.zoomTrack === track) state.zoomTrack = null;
-  }
+  } catch { if (state.zoomTrack === track) { state.zoomTrack = null; state.zoomRange = null; } }
 }
 
 async function refreshHardwareControls(request) {
@@ -151,7 +154,7 @@ async function refreshHardwareControls(request) {
   } catch { ui.flip.hidden = true; }
 }
 async function startScanner() {
-  if (state.running || state.starting || !ui.resultView.hidden) return;
+  if (state.running || state.starting || state.processing || !ui.resultView.hidden) return;
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
     status('Camera requires HTTPS or localhost. Upload from documents instead.', 'error');
     return;
@@ -165,7 +168,7 @@ async function startScanner() {
     if (request !== state.request) return;
     if (!state.scanner) {
       state.scanner = new QrScanner(ui.video, result => {
-        if (state.running && ui.resultView.hidden) showResult(result.data);
+        if (state.running && !state.processing && ui.resultView.hidden) handleDecoded(result.data);
       }, { preferredCamera: state.facing, returnDetailedScanResult: true, maxScansPerSecond: 12 });
     }
     await state.scanner.start();
@@ -217,27 +220,72 @@ async function toggleFlash() {
   } catch { toast('Flash is not supported on this device.'); }
   finally { ui.flash.disabled = false; }
 }
-function webUrl(text) {
-  const value = text.trim();
-  if (!/^https?:\/\//i.test(value)) return null;
+function reduceMotion() { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+function freezeLastFrame() {
+  const video = ui.video, canvas = ui.freeze;
   try {
-    const url = new URL(value);
-    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null;
-  } catch { return null; }
+    if (!video.videoWidth || !video.videoHeight) return;
+    const ratio = Math.min(1, 1280 / video.videoWidth);
+    canvas.width = Math.round(video.videoWidth * ratio);
+    canvas.height = Math.round(video.videoHeight * ratio);
+    canvas.getContext('2d', { alpha: false }).drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.hidden = false;
+  } catch { canvas.hidden = true; }
 }
-function showResult(text) {
-  if (typeof text !== 'string' || !text.length) return;
+function clearTransition() {
+  ui.transition.hidden = true;
+  ui.freeze.hidden = true;
+  ui.freeze.width = 0;
+  ui.freeze.height = 0;
+  ui.frame.classList.remove('is-transitioning', 'is-checking-upload');
+  document.body.classList.remove('is-scanning');
+}
+function presentResult(text, audit) {
   state.result = text;
-  const url = webUrl(text);
-  stopScanner();
-  ui.resultText.textContent = text; // Scanned data is never interpreted as HTML.
-  ui.linkCaution.hidden = !url;
-  ui.open.hidden = !url;
-  ui.copy.hidden = !!url;
-  if (url) ui.open.href = url; else ui.open.removeAttribute('href');
+  state.audit = audit;
+  ui.resultText.textContent = text; // Plain text, never HTML.
+  ui.securityPill.hidden = audit.kind === 'text';
+  ui.securityPill.className = `security-pill ${audit.severity}`;
+  ui.securityPill.textContent = audit.severity === 'review' ? 'Not verified online'
+    : audit.severity === 'caution' ? 'Check this address'
+    : audit.severity === 'blocked' ? 'Opening blocked' : '';
+  ui.linkCaution.hidden = !['caution','blocked'].includes(audit.severity);
+  ui.linkCaution.textContent = audit.message || '';
+  $('#result-title').textContent = audit.severity === 'blocked' || audit.severity === 'caution'
+    ? 'Eh, careful.' : audit.kind === 'text' ? 'Ok done.' : 'Ok done. Open?';
+  ui.open.hidden = audit.severity !== 'review';
+  ui.reviewLink.hidden = audit.severity !== 'caution';
+  ui.copy.hidden = audit.kind === 'link' && audit.severity === 'review';
+  if (audit.severity === 'review' && audit.href) ui.open.href = audit.href;
+  else ui.open.removeAttribute('href');
+  ui.riskOpen.removeAttribute('href');
   ui.scannerView.hidden = true;
+  clearTransition();
   ui.resultView.hidden = false;
+  ui.resultView.classList.remove('entering');
+  void ui.resultView.offsetWidth;
+  ui.resultView.classList.add('entering');
   $('#result-title').focus({ preventScroll: true });
+}
+async function handleDecoded(text) {
+  if (typeof text !== 'string' || !text.length || state.processing || !ui.resultView.hidden) return;
+  state.processing = true;
+  const flow = ++state.flow;
+  const wasLive = state.running;
+  if (wasLive) freezeLastFrame();
+  stopScanner(); // Shut the camera down as soon as QR content is captured.
+  if (wasLive) document.body.classList.add('is-scanning');
+  ui.frame.classList.add(wasLive ? 'is-transitioning' : 'is-checking-upload');
+  ui.transition.hidden = false;
+  // Keep the fullscreen view through the check; no sudden jump back to idle layout.
+  ui.liveControls.hidden = true;
+  ui.start.hidden = true;
+  // Local checks complete immediately; the short delay makes scanning -> result readable.
+  const audit = auditQrText(text);
+  await new Promise(resolve => setTimeout(resolve, reduceMotion() ? 100 : 760));
+  if (flow !== state.flow || document.hidden) { clearTransition(); state.processing = false; return; }
+  state.processing = false;
+  presentResult(text, audit);
 }
 // The file picker only exposes the image the user selects. Never request directory access.
 // "accept" is only a picker hint, so validate content before passing it to the decoder.
@@ -269,8 +317,9 @@ async function verifyImage(file) {
   }
 }
 async function scanImage(file) {
-  if (!file) return;
+  if (!file || state.processing) return;
   const request = ++state.imageRequest;
+  state.flow++; state.processing = false; clearTransition();
   if (state.running || state.starting) stopScanner();
   ui.chooseImage.disabled = true;
   status('Checking image…');
@@ -281,7 +330,7 @@ async function scanImage(file) {
     const QrScanner = await getDecoder().catch(() => { throw new Error('DECODER_UNAVAILABLE'); });
     if (request !== state.imageRequest) return;
     const result = await QrScanner.scanImage(file, { returnDetailedScanResult: true });
-    if (request === state.imageRequest) showResult(result.data);
+    if (request === state.imageRequest) await handleDecoded(result.data);
   } catch (err) {
     if (request === state.imageRequest) {
       const knownError = err.message?.startsWith('Only PNG') || err.message?.startsWith('Choose an image') ||
@@ -315,7 +364,7 @@ async function copyText() {
 // A per-action confirmation is under our control; browser permission persistence is not.
 // Never call camera APIs or open a file picker until the user confirms the dialog.
 function askConsent(action) {
-  if (ui.consent.open || state.starting) return;
+  if (ui.consent.open || state.starting || state.processing) return;
   state.consentAction = action;
   if (action === 'camera') {
     ui.consentTitle.textContent = 'Use camera?';
@@ -385,22 +434,35 @@ ui.consentCancel.addEventListener('click', () => ui.consent.close());
 ui.consent.addEventListener('close', () => { state.consentAction = null; });
 
 ui.start.addEventListener('click', () => askConsent('camera'));
-ui.stop.addEventListener('click', () => stopScanner());
+ui.stop.addEventListener('click', () => { state.flow++; state.processing = false; clearTransition(); stopScanner(); });
 ui.flip.addEventListener('click', flipCamera);
 ui.flash.addEventListener('click', toggleFlash);
 ui.zoom.addEventListener('input', () => {
-  if (!state.zoomTrack || !state.running) return;
-  const target = Number(ui.zoom.value);
-  if (!Number.isFinite(target)) return;
-  ui.zoomValue.textContent = formatZoom(target);
+  if (!state.zoomTrack || !state.zoomRange || !state.running) return;
+  const pct = Number(ui.zoom.value);
+  if (!Number.isFinite(pct)) return;
+  const { min, max } = state.zoomRange;
+  const target = min + (pct / 100) * (max - min);
+  ui.zoomValue.textContent = zoomLabel(target, min);
+  ui.zoom.setAttribute('aria-valuetext', `${ui.zoomValue.textContent} extra zoom`);
   state.zoomWanted = target;
   applyZoom();
 });
+ui.reviewLink.addEventListener('click', () => {
+  if (state.audit?.severity !== 'caution' || !state.audit.href) return;
+  ui.riskMessage.textContent = `${state.audit.message}. Still want to open?`;
+  ui.riskOpen.href = state.audit.href;
+  ui.riskDialog.showModal();
+  ui.riskCancel.focus();
+});
+ui.riskCancel.addEventListener('click', () => ui.riskDialog.close());
+ui.riskOpen.addEventListener('click', () => ui.riskDialog.close());
 ui.chooseImage.addEventListener('click', () => askConsent('documents'));
 ui.imageInput.addEventListener('change', () => scanImage(ui.imageInput.files?.[0]));
 ui.copy.addEventListener('click', copyText);
 ui.again.addEventListener('click', () => {
-  state.result = null;
+  state.flow++; state.processing = false; clearTransition();
+  state.result = null; state.audit = null;
   ui.resultText.textContent = '';
   ui.open.removeAttribute('href');
   ui.linkCaution.hidden = true;
@@ -411,9 +473,13 @@ ui.again.addEventListener('click', () => {
   ui.start.focus({ preventScroll: true });
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && (state.running || state.starting)) stopScanner('Camera paused. Tap to Scan to resume.');
+  if (document.hidden) {
+    state.flow++; state.processing = false; clearTransition();
+    if (state.running || state.starting) stopScanner('Camera paused. Tap to Scan to resume.');
+  }
 });
 window.addEventListener('pagehide', () => {
+  state.flow++; state.processing = false; clearTransition();
   if (state.running || state.starting) stopScanner();
   if (state.scanner) state.scanner.destroy();
   state.scanner = null;

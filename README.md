@@ -1,51 +1,52 @@
-# SCANme-QR v5
+# SCANme-QR v6
 
-A simple browser QR scanner for GitHub + Vercel. No database, login, build step or Android package.
+A lightweight, mobile-first browser QR scanner. Static HTML, CSS and JavaScript. Built for GitHub + Vercel, with no npm, login or database.
 
-## What's new
+## What's changed
 
-- Smaller J logo in the header.
-- The `QR` letters in the wordmark are replaced by a small decorative QR-like icon. It is **not a real QR code**.
-- **Tap to Scan** replaces **Scan QR**.
-- The camera preview fills the screen while scanning, with only Stop, zoom (if supported), flash (if supported), and camera switch (if supported).
-- All idle actions (Tap to Scan and Upload from documents) sit inside one large camera box.
-- A **Shortcut** button explains Add to Home Screen on iPhone/Android. Supported Chromium browsers may show a native Install prompt.
-- Included `manifest.webmanifest`, Android app icons, and an Apple touch icon based on the existing J logo.
+- **Security lane:** `security/url-audit.js` runs a **local URL precheck before the decoded address is displayed**. Normal HTTPS links show an unverified warning, suspicious URLs require another confirmation, blocked link types cannot be opened through the app. Details in `security/README.md`.
+- **Zoom at 0 extra zoom:** camera opens at the smallest zoom the device/browser reports, and the slider starts at **0**. `0` is a relative UI baseline, not a literal physical `0×` camera. Devices with no exposed zoom slider cannot be controlled by the site. Video uses `object-fit: contain` and never CSS zoom/crop, so black bars are possible when the camera aspect ratio differs from the phone screen.
+- **Moving scan line:** subtle green line travels up and down inside the scan brackets while the camera is active. Respects reduced-motion preferences.
+- **Exit animation:** after decoding, the app immediately releases the camera, shows a short "Checking link…" transition, and slides to the result page.
+- **Smiley mouse:** custom inline SVG replaces the old result tick badge.
+- **Result copy:** normal link says "Ok done. Open?". Suspicious links say "Eh, careful.". Non-link QR codes say "Ok done." and allow copying.
+- **Original branding, permissions and shortcut button** preserved.
 
-## Deployment
+## Deploy to GitHub + Vercel
 
-1. Copy all files and the `icons` folder into the **root** of the existing GitHub repository.
-2. Include `vercel.json` so security headers remain active.
-3. Vercel deploys automatically when linked to GitHub.
-4. Open the deployed HTTPS site on a phone and tap **Tap to Scan**.
+1. Extract the ZIP, copy everything into the root of your existing GitHub repository, and commit. **Keep the `security` and `icons` folders.**
+2. The Vercel deployment connected to GitHub redeploys automatically.
+3. Open the HTTPS link on your phone. Tap **Tap to Scan**, grant camera access, and point at a QR code.
+4. Camera controls vary by hardware: flashlight, camera switching, and optical/digital zoom are exposed only when supported.
 
-**Important:** The browser controls whether it retains camera permission. This app asks for its own confirmation on every scan and ends camera tracks when scanning stops, a result is found, or the page becomes hidden.
+## Security behaviour and limitations
 
-## Add to Home Screen
+Everything in `security/` runs locally. QR content isn't uploaded to a scanning server. Checks include URL protocol, embedded URL credentials, local network/IP hosts, punycode, shortened URLs, TLS, unusual ports, overly long URLs and control characters.
 
-Tap **Shortcut** in the header.
-- **Android:** If the browser offers installation, use the native prompt. Otherwise choose *Add to Home screen* or *Install app* in the browser's menu.
-- **iPhone:** Use the browser's Share menu → *Add to Home Screen* → *Add*.
+**Crucial:** This is **not** a live malware/phishing-reputation scan. A phishing address can look normal and pass. The app never labels a QR URL “safe.” No external reputation lookup, redirect inspection, DNS/IP ownership check, file content sandbox or anti-malware engine is implemented. Don't treat “No obvious red flags” as proof of safety. An ordinary-looking URL can lead to an unsafe site after you open it. User privacy was prioritized over sending scans to a third-party API without a separate design and disclosure.
 
-When launched from the Home Screen, the web app uses a standalone layout where the browser supports it. This is **not** a native APK. A browser cannot force a shortcut to appear without user action.
+If you want threat-list lookup later, use a Vercel serverless API endpoint and a reputation provider such as Google Safe Browsing (non-commercial terms) or Web Risk (commercial). Keep secrets server-side, add an explicit data-use notice, and handle unavailable lookup distinctly from a clean result. See `security/README.md`.
 
-## Security and privacy
+## Permission behaviour
 
-- QR content is rendered as text, never as executable HTML.
-- External links never auto-open; only HTTP and HTTPS are eligible for **Open**.
-- Images are processed on the device; the app only reads the selected file, with signature, size and image-dimension checks.
-- Camera session is released after scanning. The app doesn't store scan history.
-- The QR decoding library loads from jsDelivr on first use (network required). No files/QR payloads are intentionally uploaded by this code.
+- The app displays its Singlish confirmation for every camera session and document selection.
+- Camera tracks are stopped after detection, Stop, backgrounding or leaving the page.
+- Browser-managed permission persistence cannot be cleared or forced by a website.
+- Document selection exposes only the chosen image; uploads are limited to PNG/JPG/WebP and validated by format, size (10 MB max) and dimensions.
+- QR text is inserted as text, never HTML. No URL opens automatically. External links use `noopener noreferrer`, no-referrer, and only allowed HTTP(S) URLs.
+- The QR library is loaded from jsDelivr when scanning is first needed. A network connection is required for the first decoder load.
 
-## Files
+## Project files
 
-- `index.html` — page layout and dialogs
-- `style.css` — idle and immersive scanning layouts
-- `app.js` — scanner, security checks, permissions, shortcuts
-- `manifest.webmanifest` — web app installation metadata
-- `icons/` — 192px and 512px app icons
-- `J_logo.png`, `J_logo_icon.png`, `apple-touch-icon.png` — branding
-- `sample-qr.png` — test image
-- `vercel.json` — security headers
+- `index.html` / `style.css` / `app.js` — app UI and scanner logic
+- `security/url-audit.js` — pure, standalone QR security checks
+- `security/README.md` — security architecture and extension notes
+- `security/url-audit.test.mjs` — optional Node.js tests (not required to deploy)
+- `manifest.webmanifest` / `icons/` — mobile shortcut
+- `J_logo.png` / `J_logo_icon.png` / `apple-touch-icon.png` — existing J branding
+- `vercel.json` — security headers including CSP
+- `sample-qr.png` — sample QR image
 
-Try a real phone after deploying: camera zoom support, flash control and install UI differ across devices and browsers.
+## Quick checks
+
+Without a phone, you can upload `sample-qr.png`, or run `node security/url-audit.test.mjs` if Node is installed. A real mobile browser is required to verify actual camera zoom, autofocus, lens selection, flash and shortcut availability.
