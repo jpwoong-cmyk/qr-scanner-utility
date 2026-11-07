@@ -10,6 +10,8 @@ const ui = {
   frame: $('#camera-frame'), video: $('#camera-video'),
   cameraStatus: $('#camera-status'), cameraStatusText: $('#camera-status-text'),
   start: $('#start-camera'), stop: $('#stop-camera'), flip: $('#switch-camera'), flash: $('#toggle-flash'),
+  liveControls: $('#live-controls'), shortcutButton: $('#add-shortcut'), shortcutDialog: $('#shortcut-dialog'),
+  shortcutMessage: $('#shortcut-message'), shortcutClose: $('#close-shortcut'),
   zoomContainer: $('#zoom-control'), zoom: $('#zoom-slider'), zoomValue: $('#zoom-value'),
   chooseImage: $('#choose-image'), imageInput: $('#image-input'),
   resultText: $('#result-text'), open: $('#open-link'), copy: $('#copy-text'), again: $('#scan-again'),
@@ -38,12 +40,14 @@ function toast(message) {
 function status(message, kind = 'idle') {
   ui.cameraStatus.dataset.state = kind;
   ui.cameraStatusText.textContent = message;
+  ui.cameraStatus.hidden = (kind === 'idle' && message === 'Camera off');
 }
 function refreshCameraButtons() {
   ui.start.hidden = state.running;
   ui.start.disabled = state.starting;
-  ui.start.querySelector('span').textContent = state.starting ? 'Starting…' : 'Scan QR';
-  ui.stop.hidden = !state.running;
+  ui.start.querySelector('span').textContent = state.starting ? 'Opening…' : 'Tap to Scan';
+  ui.liveControls.hidden = !state.running;
+  document.body.classList.toggle('is-scanning', state.running);
   if (!state.running) { ui.flip.hidden = true; ui.flash.hidden = true; }
 }
 function stopScanner(message = 'Camera off') {
@@ -168,7 +172,8 @@ async function startScanner() {
     if (request !== state.request || !ui.resultView.hidden) { state.scanner.stop(); return; }
     state.running = true;
     ui.frame.classList.add('is-live');
-    status('Point your camera at a QR code', 'live');
+    status('Scanning', 'live');
+    refreshCameraButtons();
     await configureZoom(request);
     if (request !== state.request) return;
     await refreshHardwareControls(request);
@@ -326,6 +331,49 @@ function askConsent(action) {
   ui.consent.showModal();
   ui.consentCancel.focus();
 }
+// Home screen shortcut: browser decides whether native installation is supported.
+// iOS relies on its Share menu; we never pretend an icon was installed automatically.
+let deferredInstallPrompt = null;
+const installedMode = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+function refreshShortcutButton() {
+  ui.shortcutButton.hidden = installedMode();
+}
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  refreshShortcutButton();
+});
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  ui.shortcutDialog.close?.();
+  refreshShortcutButton();
+});
+function shortcutHelpText() {
+  const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  if (isIOS) return 'Tap Share, then Add to Home Screen, then Add.';
+  if (isAndroid) return 'Tap ⋮ in your browser, then Add to Home screen or Install app.';
+  return 'Open your browser menu and choose Install app or Create shortcut.';
+}
+ui.shortcutButton.addEventListener('click', async () => {
+  if (installedMode()) { toast('Already on your Home Screen.'); return; }
+  if (deferredInstallPrompt) {
+    const promptEvent = deferredInstallPrompt;
+    deferredInstallPrompt = null;
+    try {
+      // Browser-owned native prompt, only in response to a real user tap.
+      await promptEvent.prompt();
+      const decision = await promptEvent.userChoice;
+      if (decision?.outcome === 'accepted') return;
+    } catch { /* Browser may not support a prompt after all; show manual steps. */ }
+  }
+  ui.shortcutMessage.textContent = shortcutHelpText();
+  ui.shortcutDialog.showModal();
+});
+ui.shortcutClose.addEventListener('click', () => ui.shortcutDialog.close());
+refreshShortcutButton();
+
 ui.consentConfirm.addEventListener('click', () => {
   const action = state.consentAction;
   state.consentAction = null;
@@ -363,7 +411,7 @@ ui.again.addEventListener('click', () => {
   ui.start.focus({ preventScroll: true });
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && (state.running || state.starting)) stopScanner('Camera paused. Tap Start camera to resume.');
+  if (document.hidden && (state.running || state.starting)) stopScanner('Camera paused. Tap to Scan to resume.');
 });
 window.addEventListener('pagehide', () => {
   if (state.running || state.starting) stopScanner();
@@ -373,3 +421,4 @@ window.addEventListener('pagehide', () => {
   ui.resultText.textContent = '';
 });
 refreshCameraButtons();
+status('Camera off');

@@ -1,31 +1,51 @@
-# SCANme-QR v4
+# SCANme-QR v5
 
-Mobile-first QR scanner in plain HTML, CSS, and JavaScript, ready for GitHub + Vercel. This is an update to the working v3 scanner; no framework, backend, npm, or API key is required.
+A simple browser QR scanner for GitHub + Vercel. No database, login, build step or Android package.
 
 ## What's new
 
-- Brand header now says **SCANme-QR** and uses the supplied **J logo** in a charcoal badge.
-- Browser favicon and iPhone home-screen icon use a square icon adapted from the same logo. The original logo artwork itself has not been redrawn.
-- Shorter Singlish confirmations:
-  - Camera: **Use camera?** / **Paiseh ah, need your permission first.** / **Not now** and **Ok can**.
-  - Documents: **Want upload ah?** / **Ok loh, choose image from documents.** / **Don't want** and **Ok Choose**.
-- Cleaner scanner with **Scan QR**, **Upload from documents**, and a simple **Result** view.
+- Smaller J logo in the header.
+- The `QR` letters in the wordmark are replaced by a small decorative QR-like icon. It is **not a real QR code**.
+- **Tap to Scan** replaces **Scan QR**.
+- The camera preview fills the screen while scanning, with only Stop, zoom (if supported), flash (if supported), and camera switch (if supported).
+- All idle actions (Tap to Scan and Upload from documents) sit inside one large camera box.
+- A **Shortcut** button explains Add to Home Screen on iPhone/Android. Supported Chromium browsers may show a native Install prompt.
+- Included `manifest.webmanifest`, Android app icons, and an Apple touch icon based on the existing J logo.
 
-## Run and deploy
+## Deployment
 
-Upload the contents of this folder to the root of your existing GitHub repository. Include all image assets, the updated `index.html`, `style.css`, `app.js`, and `vercel.json`. If Vercel is connected to GitHub, it will deploy after you push. Open the HTTPS URL on your phone and verify both flows.
+1. Copy all files and the `icons` folder into the **root** of the existing GitHub repository.
+2. Include `vercel.json` so security headers remain active.
+3. Vercel deploys automatically when linked to GitHub.
+4. Open the deployed HTTPS site on a phone and tap **Tap to Scan**.
 
-The `sample-qr.png` file lets you test **Upload from documents**.
+**Important:** The browser controls whether it retains camera permission. This app asks for its own confirmation on every scan and ends camera tracks when scanning stops, a result is found, or the page becomes hidden.
 
-## Security and permissions
+## Add to Home Screen
 
-- SCANme-QR asks for **in-app confirmation every time** before starting camera or opening the file picker. It does not request directory or library access.
-- A website **cannot force the browser to revoke an already-saved camera permission** or show a fresh native permission dialog on every attempt. Choose your browser's temporary permission option, if available, or clear saved permissions in site settings.
-- When scanning stops, finishes, tab is hidden, or page is closed, the camera stream is released. **Scan again** does not automatically restart the camera.
-- Selected images are checked for PNG/JPEG/WebP file signatures and are limited to 10 MiB. Resolution is also checked where supported.
-- Scanned content is displayed as text, never HTML. Only HTTP/HTTPS links without embedded credentials receive an **Open** button; nothing auto-opens. Read the destination before visiting.
-- QR decoding happens locally in the browser using the version-pinned `qr-scanner@1.4.2` decoder loaded from jsDelivr when required. This is a third-party network dependency, but QR content and image files are not sent to an application server by our code.
-- `vercel.json` retains CSP, frame restrictions, referrer policy, and limited permissions.
-- The camera's physical 1× zoom starts at 1× or the closest available setting, and the zoom slider only appears when supported. Preview uses `object-fit: contain` to avoid cropping.
+Tap **Shortcut** in the header.
+- **Android:** If the browser offers installation, use the native prompt. Otherwise choose *Add to Home screen* or *Install app* in the browser's menu.
+- **iPhone:** Use the browser's Share menu → *Add to Home Screen* → *Add*.
 
-Files: `index.html`, `style.css`, `app.js`, `J_logo.png`, `J_logo_icon.png`, `vercel.json`, `sample-qr.png`, `README.md`.
+When launched from the Home Screen, the web app uses a standalone layout where the browser supports it. This is **not** a native APK. A browser cannot force a shortcut to appear without user action.
+
+## Security and privacy
+
+- QR content is rendered as text, never as executable HTML.
+- External links never auto-open; only HTTP and HTTPS are eligible for **Open**.
+- Images are processed on the device; the app only reads the selected file, with signature, size and image-dimension checks.
+- Camera session is released after scanning. The app doesn't store scan history.
+- The QR decoding library loads from jsDelivr on first use (network required). No files/QR payloads are intentionally uploaded by this code.
+
+## Files
+
+- `index.html` — page layout and dialogs
+- `style.css` — idle and immersive scanning layouts
+- `app.js` — scanner, security checks, permissions, shortcuts
+- `manifest.webmanifest` — web app installation metadata
+- `icons/` — 192px and 512px app icons
+- `J_logo.png`, `J_logo_icon.png`, `apple-touch-icon.png` — branding
+- `sample-qr.png` — test image
+- `vercel.json` — security headers
+
+Try a real phone after deploying: camera zoom support, flash control and install UI differ across devices and browsers.

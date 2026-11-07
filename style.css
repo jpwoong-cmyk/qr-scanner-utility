@@ -2,90 +2,116 @@
   color-scheme: light;
   --blue: #2563eb;
   --blue-hover: #1d4ed8;
-  --line: #dce4ef;
-  --muted: #61728a;
   --text: #1d2a3d;
+  --line: #dce4ef;
   --bg: #f6f8fc;
 }
 * { box-sizing: border-box; }
 html { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--bg); color: var(--text); }
+body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text); }
 button, input { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: wait; opacity: .7; }
 [hidden] { display: none !important; }
-:focus-visible { outline: 3px solid #7aa9ff; outline-offset: 3px; }
+:focus-visible { outline: 3px solid #8bb7ff; outline-offset: 3px; }
 .svg-sprite, .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .icon { display: inline-block; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; flex: none; }
-.app-shell { width: min(100% - 32px, 530px); margin: 0 auto; padding: 16px 0 32px; }
-.topbar { display: flex; align-items: center; gap: 12px; min-height: 66px; margin-bottom: 10px; }
-.topbar strong { font-size: 20px; letter-spacing: -.5px; white-space: nowrap; }
-/* The original transparent J logo has silver artwork: charcoal makes it legible. */
-.brand-icon { display: grid; place-items: center; width: 128px; height: 54px; padding: 5px; flex: none; overflow: hidden; border-radius: 10px; background: #111924; border: 1px solid #283444; }
-.brand-icon img { display: block; width: 100%; max-width: 118px; height: 100%; object-fit: contain; }
-main { background: white; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 4px 20px rgba(28,52,91,.035); padding: 17px; }
-.camera-frame { position: relative; overflow: hidden; isolation: isolate; display: grid; place-items: center; width: 100%; aspect-ratio: 1 / 1; max-height: min(53dvh, 450px); background: #101b2b; border-radius: 9px; }
-.camera-frame video { position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: contain; opacity: 0; }
+
+.app-shell { width: min(100% - 28px, 1000px); min-height: 100dvh; margin: auto; padding: max(10px, env(safe-area-inset-top)) 0 max(12px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 55px; margin-bottom: 9px; }
+.brand-lockup { display: flex; align-items: center; gap: 9px; min-width: 0; }
+/* Deliberately small branded mark. Retains silver mouse and tail. */
+.brand-icon { display: grid; place-items: center; flex: none; width: 87px; height: 38px; padding: 3px; background: #111924; border: 1px solid #283444; border-radius: 7px; }
+.brand-icon img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.wordmark { display: flex; align-items: center; white-space: nowrap; font-size: clamp(15px, 4vw, 21px); font-weight: 760; letter-spacing: -.6px; }
+.brand-qr { display: block; width: 21px; height: 21px; margin-left: 1px; flex: none; }
+.shortcut-trigger { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 6px 11px; border-radius: 8px; border: 1px solid #cdd8e8; color: #244067; font-size: 12px; font-weight: 710; background: #fff; white-space: nowrap; }
+.shortcut-trigger:hover { border-color: #8aace8; background: #f1f5ff; }
+.shortcut-trigger .icon { width: 18px; height: 18px; }
+
+main { flex: 1; min-height: 0; display: flex; }
+.scanner-view { min-width: 0; flex: 1; display: flex; }
+.camera-frame { position: relative; isolation: isolate; display: grid; place-items: center; width: 100%; min-height: max(480px, calc(100dvh - 99px)); overflow: hidden; border: 1px solid #25334a; border-radius: 14px; background: #101b2b; }
+.camera-frame video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; opacity: 0; object-fit: contain; background: #070d14; }
 .camera-frame.is-live video { opacity: 1; }
-.camera-placeholder { display: flex; align-items: center; flex-direction: column; color: #d5dfeb; }
-.camera-placeholder .icon { width: 35px; height: 35px; color: #97abc3; }
+.camera-placeholder { position: relative; z-index: 1; display: grid; place-items: center; height: 100%; width: 100%; }
 .camera-frame.is-live .camera-placeholder { display: none; }
-.scan-guide { display: none; pointer-events: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(66%, 220px); aspect-ratio: 1; }
+.idle-panel { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 0; width: 100%; padding: 24px; }
+/* The pseudo-QR has no payload or error correction and is intentionally unscannable. */
+.idle-mark { display: grid; place-items: center; width: 80px; height: 80px; margin-bottom: 26px; border: 1px solid #344558; border-radius: 17px; background: #192739; color: #e7f0ff; }
+.idle-mark svg { width: 39px; height: 39px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; min-width: 0; padding: 10px 18px; border: 1px solid transparent; border-radius: 9px; text-decoration: none; font-size: 14px; font-weight: 720; line-height: 1.2; }
+.btn-primary { color: #fff; background: var(--blue); }
+.btn-primary:hover:not(:disabled) { background: var(--blue-hover); }
+.btn-secondary { background: #fff; color: #34445b; border-color: #ccd8e8; }
+.btn-secondary:hover:not(:disabled) { border-color: #8ba7d6; background: #f7faff; }
+#start-camera { min-width: 194px; }
+.upload-button { display: inline-flex; align-items: center; gap: 8px; border: 0; margin-top: 17px; padding: 10px; color: #c8dcff; font-size: 13px; font-weight: 650; background: transparent; }
+.upload-button:hover { color: #fff; text-decoration: underline; }
+.upload-button .icon { width: 17px; height: 17px; }
+.status-line { max-width: 310px; margin: 12px 0 0; text-align: center; color: #93a5be; font-size: 12px; line-height: 1.5; }
+.status-line[data-state="error"] { color: #ffbec7; }
+.status-line[data-state="live"] { color: #bcd9c9; }
+
+/* Immersive scanning view; no unsupported Fullscreen API needed. */
+body.is-scanning { overflow: hidden; background: #000; }
+body.is-scanning .topbar { display: none; }
+body.is-scanning .app-shell { width: 100%; min-height: 100dvh; padding: 0; }
+body.is-scanning .scanner-view { position: fixed; z-index: 20; inset: 0; width: 100vw; height: 100dvh; }
+body.is-scanning .camera-frame { border: 0; border-radius: 0; width: 100%; height: 100dvh; min-height: 0; }
+.scan-guide { display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: min(68vw, 55dvh, 350px); aspect-ratio: 1; pointer-events: none; }
 .camera-frame.is-live .scan-guide { display: block; }
-.corner { position: absolute; width: 24px; height: 24px; border: 3px solid #eef6ff; }
+.corner { position: absolute; width: 28px; height: 28px; border: 3px solid #eaf4ff; }
 .corner.tl { left: 0; top: 0; border-right: 0; border-bottom: 0; border-radius: 5px 0 0 0; }
 .corner.tr { right: 0; top: 0; border-left: 0; border-bottom: 0; border-radius: 0 5px 0 0; }
 .corner.bl { left: 0; bottom: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 5px; }
 .corner.br { right: 0; bottom: 0; border-left: 0; border-top: 0; border-radius: 0 0 5px 0; }
-.zoom-control { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); z-index: 4; width: 42px; height: 196px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 10px 4px 8px; background: rgba(6,17,35,.72); color: #fff; border: 1px solid rgba(255,255,255,.16); border-radius: 24px; backdrop-filter: blur(5px); }
+.live-controls { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
+.live-controls button { pointer-events: auto; }
+.live-stop { position: absolute; top: max(18px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); display: inline-flex; align-items: center; gap: 6px; min-height: 43px; padding: 9px 13px; border: 1px solid rgba(255,255,255,.3); border-radius: 24px; background: rgba(12,20,34,.75); color: #fff; font-weight: 720; font-size: 13px; }
+.live-stop .icon { width: 17px; height: 17px; }
+.live-tools { position: absolute; bottom: max(22px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 15px; }
+.live-tool { display: grid; place-items: center; width: 48px; height: 48px; color: #fff; border: 1px solid rgba(255,255,255,.3); border-radius: 50%; background: rgba(12,20,34,.73); }
+.live-tool[aria-pressed="true"] { background: #2563eb; }
+.zoom-control { position: absolute; right: max(13px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); z-index: 5; width: 42px; height: 196px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 10px 4px 8px; background: rgba(6,17,35,.75); color: #fff; border: 1px solid rgba(255,255,255,.18); border-radius: 24px; backdrop-filter: blur(6px); }
 #zoom-value { font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; }
 #zoom-slider { display: block; width: 114px; height: 24px; margin: 44px -40px 43px; transform: rotate(-90deg); accent-color: #72a4ff; cursor: pointer; touch-action: none; }
 .zoom-caption { font-size: 8px; font-weight: 700; letter-spacing: .8px; }
-.status-line { display: flex; align-items: flex-start; gap: 8px; color: var(--muted); font-size: 12px; line-height: 1.45; min-height: 20px; margin: 15px 2px 15px; }
-.status-dot { width: 7px; height: 7px; margin-top: 5px; background: #a3b0c3; border-radius: 50%; flex: none; }
-.status-line[data-state="live"] .status-dot { background: #22a76c; }
-.status-line[data-state="error"] { color: #b42338; }
-.status-line[data-state="error"] .status-dot { background: #df4055; }
-.camera-actions, .result-actions { display: flex; align-items: stretch; gap: 9px; flex-wrap: wrap; }
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; min-width: 0; padding: 10px 17px; border: 1px solid transparent; border-radius: 8px; text-decoration: none; font-weight: 680; font-size: 14px; line-height: 1.2; transition: background .15s, border-color .15s; }
-.btn-primary { color: white; background: var(--blue); }
-.btn-primary:hover:not(:disabled) { background: var(--blue-hover); }
-.btn-secondary { background: white; color: #34445b; border-color: #ccd8e8; }
-.btn-secondary:hover:not(:disabled) { border-color: #99b1dc; background: #f7f9ff; }
-.btn-square { width: 46px; padding: 0; }
-.camera-actions #start-camera { width: 100%; }
-.camera-actions #stop-camera { flex: 1 1 auto; }
-.upload-actions { text-align: center; padding: 14px 0 2px; }
-.upload-button { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 0; color: var(--blue); background: transparent; font-size: 13px; font-weight: 650; }
-.upload-button:hover { text-decoration: underline; }
-.upload-button .icon { width: 17px; height: 17px; }
-.result-view { text-align: center; padding: 30px 1px 21px; }
+
+.result-view { flex: 1; max-width: 640px; margin: auto; padding: 28px; text-align: center; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
 .result-success { display: grid; place-items: center; width: 52px; height: 52px; margin: 0 auto 14px; border-radius: 50%; background: #e7f8ee; color: #14925b; }
 .result-success .icon { width: 27px; height: 27px; }
-.result-view h1 { font-size: 20px; margin: 0 0 21px; letter-spacing: -.35px; }
-.result-content { text-align: left; border: 1px solid var(--line); background: #f7f9fc; color: #25364c; border-radius: 8px; padding: 18px; font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; white-space: pre-wrap; max-height: 38vh; overflow-y: auto; }
-.result-actions { margin-top: 19px; }
-.result-actions > * { flex: 1; }
-.toast { position: fixed; left: 50%; bottom: max(22px, env(safe-area-inset-bottom)); transform: translateX(-50%); border-radius: 8px; background: #243951; color: #fff; padding: 12px 17px; font-size: 13px; max-width: calc(100vw - 30px); text-align: center; box-shadow: 0 12px 24px rgba(0,0,0,.15); }
-@media (max-width: 420px) { .app-shell { width: calc(100% - 20px); padding-top: 7px; } .topbar { min-height: 62px; } main { padding: 10px; border-radius: 12px; } .camera-frame { max-height: 51dvh; } .result-view { padding: 25px 7px 17px; } }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.result-view h1 { font-size: 20px; margin: 0 0 20px; }
+.result-content { text-align: left; border: 1px solid var(--line); background: #f7f9fc; color: #25364c; border-radius: 8px; padding: 16px; font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; white-space: pre-wrap; max-height: min(40dvh,380px); overflow-y: auto; }
+.result-actions { display: flex; align-items: stretch; gap: 9px; flex-wrap: wrap; margin-top: 20px; }
+.result-actions > * { flex: 1 1 150px; }
+.link-caution { color: #86520b; font-size: 12px; margin: 12px 0 0; }
 
-/* One-action-at-a-time consent. Native dialog traps focus and supports Escape. */
-.permission-dialog { position: fixed; width: min(calc(100vw - 32px), 420px); max-height: min(86dvh, 680px); margin: auto; padding: 0; border: 1px solid #dce4ef; border-radius: 14px; color: var(--text); background: #fff; box-shadow: 0 24px 80px rgba(8,24,46,.27); overflow: auto; }
-.permission-dialog::backdrop { background: rgba(13, 28, 47, .62); }
-.permission-inner { padding: 22px 22px 20px; }
-/* Brand mark is from J_logo.png, not the generic QR icon. */
+.permission-dialog, .shortcut-dialog { position: fixed; width: min(calc(100vw - 32px), 420px); max-height: 86dvh; margin: auto; padding: 0; border: 1px solid #dce4ef; border-radius: 14px; color: var(--text); background: #fff; box-shadow: 0 24px 80px rgba(8,24,46,.27); overflow: auto; }
+.permission-dialog::backdrop, .shortcut-dialog::backdrop { background: rgba(13,28,47,.65); }
+.permission-inner, .shortcut-inner { padding: 22px 22px 20px; }
 .permission-mark { display: grid; place-items: center; width: 51px; height: 51px; border-radius: 11px; margin-bottom: 14px; background: #111924; overflow: hidden; }
 .permission-mark img { width: 48px; height: 48px; object-fit: contain; }
-.permission-dialog h2 { font-size: 20px; margin: 0 0 10px; letter-spacing: -.3px; }
-#permission-message { font-size: 15px; line-height: 1.5; margin: 0 0 21px; color: #56657a; }
+.permission-dialog h2, .shortcut-dialog h2 { font-size: 20px; margin: 0 0 9px; letter-spacing: -.3px; }
+#permission-message, #shortcut-message { font-size: 15px; line-height: 1.5; margin: 0 0 20px; color: #56657a; }
 .permission-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .permission-actions .btn { width: 100%; }
-.link-caution { color: #86520b; font-size: 12px; margin: 12px 0 0; }
-@media (max-width: 360px) { .permission-inner { padding: 20px 16px; } .permission-actions { grid-template-columns: 1fr; } }
-
-@media (max-width: 350px) {
-  .topbar { gap: 9px; }
-  .brand-icon { width: 101px; height: 49px; padding: 4px; }
-  .topbar strong { font-size: 18px; }
+.shortcut-inner .btn { width: 100%; }
+.toast { position: fixed; z-index: 100; left: 50%; bottom: max(22px, env(safe-area-inset-bottom)); transform: translateX(-50%); border-radius: 8px; background: #243951; color: #fff; padding: 12px 17px; font-size: 13px; max-width: calc(100vw - 30px); text-align: center; box-shadow: 0 12px 24px rgba(0,0,0,.15); }
+@media (max-width: 480px) {
+  .app-shell { width: calc(100% - 16px); }
+  .topbar { gap: 5px; }
+  .brand-icon { width: 66px; height: 32px; padding: 2px; }
+  .wordmark { font-size: 17px; }
+  .brand-qr { width: 18px; height: 18px; }
+  .shortcut-trigger { padding: 6px 8px; gap: 5px; }
+  .shortcut-trigger span { font-size: 11px; }
+  .camera-frame { min-height: max(440px, calc(100dvh - 91px)); border-radius: 10px; }
+  .result-view { padding: 23px 15px; }
 }
+@media (max-width: 355px) {
+  .brand-icon { width: 44px; }
+  .wordmark { font-size: 15px; }
+  .shortcut-trigger span { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
