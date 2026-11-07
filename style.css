@@ -188,3 +188,34 @@ body.is-scanning .camera-frame { border: 0; border-radius: 0; width: 100%; heigh
   .camera-frame.is-transitioning .scan-guide, .result-view.entering { animation: none !important; }
   .scan-beam { top: 50%; }
 }
+
+/* v8: animated success mark, replays each time the result screen enters */
+.result-success {
+  width: 54px;
+  height: 54px;
+  color: #15945c;
+}
+.drawn-check { display: block; width: 54px; height: 54px; }
+.check-ring {
+  stroke-dasharray: 145;
+  stroke-dashoffset: 145;
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+.check-stroke {
+  stroke-dasharray: 44;
+  stroke-dashoffset: 44;
+}
+.result-view.entering .check-ring {
+  animation: drawRing .48s ease-out forwards;
+}
+.result-view.entering .check-stroke {
+  animation: drawTick .42s ease-out .45s forwards;
+}
+@keyframes drawRing { to { stroke-dashoffset: 0; } }
+@keyframes drawTick { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .result-view.entering .check-ring,
+  .result-view.entering .check-stroke { animation: none !important; }
+  .check-ring, .check-stroke { stroke-dashoffset: 0; }
+}
