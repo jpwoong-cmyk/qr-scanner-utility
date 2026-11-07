@@ -68,3 +68,17 @@ main { background: white; border: 1px solid var(--line); border-radius: 14px; bo
 .toast { position: fixed; left: 50%; bottom: max(22px, env(safe-area-inset-bottom)); transform: translateX(-50%); border-radius: 8px; background: #243951; color: #fff; padding: 12px 17px; font-size: 13px; max-width: calc(100vw - 30px); text-align: center; box-shadow: 0 12px 24px rgba(0,0,0,.15); }
 @media (max-width: 420px) { .app-shell { width: calc(100% - 20px); padding-top: 7px; } .topbar { min-height: 60px; } main { padding: 10px; border-radius: 12px; } .camera-frame { max-height: 51dvh; } .result-view { padding: 25px 7px 17px; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* One-action-at-a-time consent. Native dialog traps focus and supports Escape. */
+.permission-dialog { position: fixed; width: min(calc(100vw - 32px), 420px); max-height: min(86dvh, 680px); margin: auto; padding: 0; border: 1px solid #dce4ef; border-radius: 14px; color: var(--text); background: #fff; box-shadow: 0 24px 80px rgba(8,24,46,.27); overflow: auto; }
+.permission-dialog::backdrop { background: rgba(13, 28, 47, .62); }
+.permission-inner { padding: 25px 23px 22px; }
+.permission-mark { display: grid; place-items: center; width: 42px; height: 42px; color: #2563eb; background: #eaf1ff; border-radius: 10px; margin-bottom: 15px; }
+.permission-mark .icon { width: 24px; height: 24px; }
+.permission-dialog h2 { font-size: 20px; margin: 0 0 10px; letter-spacing: -.3px; }
+#permission-message { font-size: 15px; line-height: 1.55; margin: 0 0 12px; }
+.permission-detail { font-size: 12px; line-height: 1.55; color: var(--muted); margin: 0 0 22px; }
+.permission-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.permission-actions .btn { width: 100%; }
+.link-caution { color: #86520b; font-size: 12px; margin: 12px 0 0; }
+@media (max-width: 360px) { .permission-inner { padding: 20px 16px; } .permission-actions { grid-template-columns: 1fr; } }

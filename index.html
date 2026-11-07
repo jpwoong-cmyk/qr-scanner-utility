@@ -4,10 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f8fc">
-  <meta name="description" content="Scan QR codes with your camera or from a photo.">
-  <title>QR Scanner</title>
+  <meta name="description" content="Scanme-QR scans QR codes using your camera or a document image.">
+  <title>Scanme-QR</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="style.css">
   <script type="module" src="app.js"></script>
 </head>
@@ -28,7 +27,7 @@
   <div class="app-shell">
     <header class="topbar">
       <span class="brand-icon" aria-hidden="true"><svg class="icon"><use href="#i-qr"/></svg></span>
-      <strong>QR Scanner</strong>
+      <strong>Scanme-QR</strong>
     </header>
 
     <main>
@@ -54,8 +53,8 @@
           <button class="btn btn-secondary btn-square" id="toggle-flash" type="button" aria-label="Turn flash on" title="Flash" aria-pressed="false" hidden><svg class="icon" aria-hidden="true"><use href="#i-flash"/></svg></button>
         </div>
         <div class="upload-actions">
-          <button class="upload-button" id="choose-image" type="button"><svg class="icon" aria-hidden="true"><use href="#i-image"/></svg> Scan an image instead</button>
-          <input type="file" id="image-input" accept="image/*" class="visually-hidden" aria-label="Choose QR image">
+          <button class="upload-button" id="choose-image" type="button"><svg class="icon" aria-hidden="true"><use href="#i-image"/></svg> Upload from documents</button>
+          <input type="file" id="image-input" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" class="visually-hidden" aria-label="Choose QR image from documents">
         </div>
       </section>
 
@@ -63,14 +62,27 @@
         <span class="result-success" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></span>
         <h1 id="result-title" tabindex="-1">QR code scanned</h1>
         <div class="result-content" id="result-text" aria-label="Decoded QR content"></div>
+        <p class="link-caution" id="link-caution" hidden>Check the link before you open it.</p>
         <div class="result-actions">
-          <a class="btn btn-primary" id="open-link" target="_blank" rel="noopener noreferrer" hidden><svg class="icon" aria-hidden="true"><use href="#i-external"/></svg> Open</a>
+          <a class="btn btn-primary" id="open-link" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden><svg class="icon" aria-hidden="true"><use href="#i-external"/></svg> Open</a>
           <button class="btn btn-primary" id="copy-text" type="button" hidden><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg> Copy text</button>
           <button class="btn btn-secondary" id="scan-again" type="button"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg> Scan again</button>
         </div>
       </section>
     </main>
   </div>
+  <dialog class="permission-dialog" id="permission-dialog" aria-labelledby="permission-title" aria-describedby="permission-message permission-detail">
+    <div class="permission-inner">
+      <span class="permission-mark" aria-hidden="true"><svg class="icon"><use href="#i-qr"/></svg></span>
+      <h2 id="permission-title">Permission first, can?</h2>
+      <p id="permission-message">Paiseh ah, need ask you permission again. Don't want later your phone open access to Scanme-QR</p>
+      <p id="permission-detail" class="permission-detail"></p>
+      <div class="permission-actions">
+        <button class="btn btn-secondary" id="cancel-permission" type="button">Not now</button>
+        <button class="btn btn-primary" id="confirm-permission" type="button">Allow this time</button>
+      </div>
+    </div>
+  </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 </body>
 </html>

@@ -1,6 +1,8 @@
 // Browser-only QR scanner. Reuses Phase 1's decoder, camera/flash and image upload.
 const QR_LIBRARY_URL = 'https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js';
-const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_PIXELS = 40_000_000;
+const ALLOWED_IMAGE_FORMATS = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const $ = (selector) => document.querySelector(selector);
 
 const ui = {
@@ -12,11 +14,14 @@ const ui = {
   chooseImage: $('#choose-image'), imageInput: $('#image-input'),
   resultText: $('#result-text'), open: $('#open-link'), copy: $('#copy-text'), again: $('#scan-again'),
   toast: $('#toast'),
+  consent: $('#permission-dialog'), consentTitle: $('#permission-title'),
+  consentDetail: $('#permission-detail'), consentConfirm: $('#confirm-permission'),
+  consentCancel: $('#cancel-permission'), linkCaution: $('#link-caution'),
 };
 const state = {
   scanner: null, running: false, starting: false, facing: 'environment',
   request: 0, imageRequest: 0, zoomTrack: null, zoomWanted: null,
-  zoomApplying: false, result: null, toastTimer: null,
+  zoomApplying: false, result: null, toastTimer: null, consentAction: null,
 };
 let decoderPromise = null;
 
@@ -49,6 +54,10 @@ function stopScanner(message = 'Camera off') {
   state.zoomWanted = null;
   ui.zoomContainer.hidden = true;
   if (state.scanner) state.scanner.stop();
+  // Explicitly end all camera tracks; do not retain an active camera stream.
+  const stream = ui.video.srcObject;
+  if (stream?.getTracks) stream.getTracks().forEach(track => track.stop());
+  ui.video.srcObject = null;
   ui.frame.classList.remove('is-live');
   ui.flash.setAttribute('aria-pressed', 'false');
   ui.flash.setAttribute('aria-label', 'Turn flash on');
@@ -59,7 +68,7 @@ function cameraError(error) {
   if (error?.message === 'DECODER_UNAVAILABLE') return 'Scanner could not load. Check your internet connection.';
   switch (error?.name) {
     case 'NotAllowedError': case 'PermissionDeniedError': case 'SecurityError': return 'Camera permission denied. Allow access in browser settings.';
-    case 'NotFoundError': case 'DevicesNotFoundError': return 'No camera found. Try scanning an image.';
+    case 'NotFoundError': case 'DevicesNotFoundError': return 'No camera found. Try Upload from documents.';
     case 'NotReadableError': case 'TrackStartError': return 'Camera is in use by another app.';
     default: return 'Unable to start the camera. Try again.';
   }
@@ -140,7 +149,7 @@ async function refreshHardwareControls(request) {
 async function startScanner() {
   if (state.running || state.starting || !ui.resultView.hidden) return;
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
-    status('Camera requires HTTPS or localhost. You can still scan an image.', 'error');
+    status('Camera requires HTTPS or localhost. Upload from documents instead.', 'error');
     return;
   }
   const request = ++state.request;
@@ -208,7 +217,7 @@ function webUrl(text) {
   if (!/^https?:\/\//i.test(value)) return null;
   try {
     const url = new URL(value);
-    return ['http:', 'https:'].includes(url.protocol) ? url.href : null;
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null;
   } catch { return null; }
 }
 function showResult(text) {
@@ -217,6 +226,7 @@ function showResult(text) {
   const url = webUrl(text);
   stopScanner();
   ui.resultText.textContent = text; // Scanned data is never interpreted as HTML.
+  ui.linkCaution.hidden = !url;
   ui.open.hidden = !url;
   ui.copy.hidden = !!url;
   if (url) ui.open.href = url; else ui.open.removeAttribute('href');
@@ -224,28 +234,63 @@ function showResult(text) {
   ui.resultView.hidden = false;
   $('#result-title').focus({ preventScroll: true });
 }
+// The file picker only exposes the image the user selects. Never request directory access.
+// "accept" is only a picker hint, so validate content before passing it to the decoder.
+async function verifyImage(file) {
+  if (!(file instanceof File) || file.size === 0 || file.size > MAX_UPLOAD_BYTES) {
+    throw new Error('Choose an image smaller than 10 MB.');
+  }
+  const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  const signature = (bytes) => bytes.every((v, i) => header[i] === v);
+  let format = null;
+  if (signature([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a])) format = 'image/png';
+  else if (signature([0xff,0xd8,0xff])) format = 'image/jpeg';
+  else if (signature([0x52,0x49,0x46,0x46]) &&
+           String.fromCharCode(...header.slice(8,12)) === 'WEBP') format = 'image/webp';
+  if (!ALLOWED_IMAGE_FORMATS.has(format) || (file.type && file.type !== format)) {
+    throw new Error('Only PNG, JPG and WebP images are allowed.');
+  }
+  if ('createImageBitmap' in window) {
+    let bitmap;
+    try {
+      bitmap = await createImageBitmap(file);
+      if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > MAX_IMAGE_PIXELS) {
+        throw new Error('Image resolution is too large.');
+      }
+    } catch (err) {
+      if (err.message === 'Image resolution is too large.') throw err;
+      throw new Error('This image could not be read.');
+    } finally { bitmap?.close?.(); }
+  }
+}
 async function scanImage(file) {
   if (!file) return;
   const request = ++state.imageRequest;
-  if (!file.type.startsWith('image/') && !/\.(png|jpe?g|webp|gif|bmp|avif|heic|heif)$/i.test(file.name)) {
-    status('Please choose a QR code image.', 'error'); return;
-  }
-  if (file.size > MAX_UPLOAD_BYTES) { status('Image must be smaller than 15 MB.', 'error'); return; }
   if (state.running || state.starting) stopScanner();
   ui.chooseImage.disabled = true;
-  status('Scanning image…');
+  status('Checking image…');
   try {
+    await verifyImage(file);
+    if (request !== state.imageRequest) return;
+    status('Scanning image…');
     const QrScanner = await getDecoder().catch(() => { throw new Error('DECODER_UNAVAILABLE'); });
     if (request !== state.imageRequest) return;
     const result = await QrScanner.scanImage(file, { returnDetailedScanResult: true });
     if (request === state.imageRequest) showResult(result.data);
   } catch (err) {
-    if (request === state.imageRequest) status(err.message === 'DECODER_UNAVAILABLE' ? 'Scanner could not load. Check your connection.' : 'No QR code found. Try a clearer image.', 'error');
+    if (request === state.imageRequest) {
+      const knownError = err.message?.startsWith('Only PNG') || err.message?.startsWith('Choose an image') ||
+                         err.message?.startsWith('Image resolution') || err.message?.startsWith('This image');
+      status(knownError ? err.message : err.message === 'DECODER_UNAVAILABLE'
+        ? 'Scanner could not load. Check your connection.'
+        : 'No QR code found. Try a clearer image.', 'error');
+    }
   } finally {
     ui.imageInput.value = '';
     ui.chooseImage.disabled = false;
   }
 }
+
 async function copyText() {
   try {
     if (navigator.clipboard?.writeText && window.isSecureContext) await navigator.clipboard.writeText(state.result);
@@ -262,7 +307,30 @@ async function copyText() {
   } catch { toast('Copy failed. Select the text to copy it.'); }
 }
 
-ui.start.addEventListener('click', startScanner);
+// A per-action confirmation is under our control; browser permission persistence is not.
+// Never call camera APIs or open a file picker until the user confirms the dialog.
+function askConsent(action) {
+  if (ui.consent.open || state.starting) return;
+  state.consentAction = action;
+  ui.consentTitle.textContent = action === 'camera' ? 'Camera access' : 'Document access';
+  ui.consentDetail.textContent = action === 'camera'
+    ? 'Camera will switch off after a scan or when you leave. Your browser may remember its own permission; change that in Site settings.'
+    : 'Only the image you choose will be read on this device. No document library or folder access is granted.';
+  ui.consentConfirm.textContent = action === 'camera' ? 'Allow this time' : 'Choose document';
+  ui.consent.showModal();
+  ui.consentCancel.focus();
+}
+ui.consentConfirm.addEventListener('click', () => {
+  const action = state.consentAction;
+  state.consentAction = null;
+  ui.consent.close();
+  if (action === 'camera') startScanner();
+  if (action === 'documents') { ui.imageInput.value = ''; ui.imageInput.click(); }
+});
+ui.consentCancel.addEventListener('click', () => ui.consent.close());
+ui.consent.addEventListener('close', () => { state.consentAction = null; });
+
+ui.start.addEventListener('click', () => askConsent('camera'));
 ui.stop.addEventListener('click', () => stopScanner());
 ui.flip.addEventListener('click', flipCamera);
 ui.flash.addEventListener('click', toggleFlash);
@@ -274,17 +342,28 @@ ui.zoom.addEventListener('input', () => {
   state.zoomWanted = target;
   applyZoom();
 });
-ui.chooseImage.addEventListener('click', () => ui.imageInput.click());
+ui.chooseImage.addEventListener('click', () => askConsent('documents'));
 ui.imageInput.addEventListener('change', () => scanImage(ui.imageInput.files?.[0]));
 ui.copy.addEventListener('click', copyText);
 ui.again.addEventListener('click', () => {
   state.result = null;
+  ui.resultText.textContent = '';
+  ui.open.removeAttribute('href');
+  ui.linkCaution.hidden = true;
   ui.resultView.hidden = true;
   ui.scannerView.hidden = false;
-  startScanner();
+  status('Camera off');
+  // Deliberately no auto-start. A new scan needs another consent action.
+  ui.start.focus({ preventScroll: true });
 });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && (state.running || state.starting)) stopScanner('Camera paused. Tap Start camera to resume.');
 });
-window.addEventListener('pagehide', () => { if (state.scanner) state.scanner.destroy(); state.scanner = null; });
+window.addEventListener('pagehide', () => {
+  if (state.running || state.starting) stopScanner();
+  if (state.scanner) state.scanner.destroy();
+  state.scanner = null;
+  state.result = null;
+  ui.resultText.textContent = '';
+});
 refreshCameraButtons();
