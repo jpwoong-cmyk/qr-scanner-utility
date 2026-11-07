@@ -1,6 +1,6 @@
 // SCANme-QR. Only QR decoding happens in the camera; links are audited locally before result display.
 import { auditQrText } from './security/url-audit.js';
-const QR_LIBRARY_URL = 'https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js';
+const QR_LIBRARY_URL = './utility/qr-scanner.min.js';
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_PIXELS = 40_000_000;
 const ALLOWED_IMAGE_FORMATS = new Set(['image/png', 'image/jpeg', 'image/webp']);
