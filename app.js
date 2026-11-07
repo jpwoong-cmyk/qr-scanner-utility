@@ -244,10 +244,10 @@ function presentResult(text, audit) {
   state.result = text;
   state.audit = audit;
   ui.resultText.textContent = text; // Plain text, never HTML.
-  ui.securityPill.hidden = audit.kind === 'text';
+  // Keep useful warnings, but don't show a badge on ordinary results.
+  ui.securityPill.hidden = !['caution', 'blocked'].includes(audit.severity);
   ui.securityPill.className = `security-pill ${audit.severity}`;
-  ui.securityPill.textContent = audit.severity === 'review' ? 'Not verified online'
-    : audit.severity === 'caution' ? 'Check this address'
+  ui.securityPill.textContent = audit.severity === 'caution' ? 'Check this address'
     : audit.severity === 'blocked' ? 'Opening blocked' : '';
   ui.linkCaution.hidden = !['caution','blocked'].includes(audit.severity);
   ui.linkCaution.textContent = audit.message || '';
@@ -461,16 +461,22 @@ ui.chooseImage.addEventListener('click', () => askConsent('documents'));
 ui.imageInput.addEventListener('change', () => scanImage(ui.imageInput.files?.[0]));
 ui.copy.addEventListener('click', copyText);
 ui.again.addEventListener('click', () => {
-  state.flow++; state.processing = false; clearTransition();
+  state.flow++;
+  state.imageRequest++; // Invalidate unfinished image scans too.
+  state.processing = false;
+  clearTransition();
+  stopScanner();
   state.result = null; state.audit = null;
   ui.resultText.textContent = '';
   ui.open.removeAttribute('href');
   ui.linkCaution.hidden = true;
+  ui.securityPill.hidden = true;
   ui.resultView.hidden = true;
   ui.scannerView.hidden = false;
-  status('Camera off');
-  // Deliberately no auto-start. A new scan needs another consent action.
-  ui.start.focus({ preventScroll: true });
+  refreshCameraButtons(); // Restore Tap to Scan if the user declines permission.
+  // Scan again starts a NEW scan, not the idle/upload screen.
+  // Retain the per-session permission confirmation requested for security.
+  askConsent('camera');
 });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {

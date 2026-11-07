@@ -1,16 +1,19 @@
-# SCANme-QR v6
+# SCANme-QR v7
 
 A lightweight, mobile-first browser QR scanner. Static HTML, CSS and JavaScript. Built for GitHub + Vercel, with no npm, login or database.
 
 ## What's changed
 
-- **Security lane:** `security/url-audit.js` runs a **local URL precheck before the decoded address is displayed**. Normal HTTPS links show an unverified warning, suspicious URLs require another confirmation, blocked link types cannot be opened through the app. Details in `security/README.md`.
+- **Security lane:** `security/url-audit.js` runs a **local URL precheck before the decoded address is displayed**. Normal HTTPS links show the decoded address without an extra badge; suspicious URLs require another confirmation; blocked link types cannot be opened through the app. Details in `security/README.md`.
 - **Zoom at 0 extra zoom:** camera opens at the smallest zoom the device/browser reports, and the slider starts at **0**. `0` is a relative UI baseline, not a literal physical `0×` camera. Devices with no exposed zoom slider cannot be controlled by the site. Video uses `object-fit: contain` and never CSS zoom/crop, so black bars are possible when the camera aspect ratio differs from the phone screen.
 - **Moving scan line:** subtle green line travels up and down inside the scan brackets while the camera is active. Respects reduced-motion preferences.
 - **Exit animation:** after decoding, the app immediately releases the camera, shows a short "Checking link…" transition, and slides to the result page.
-- **Smiley mouse:** custom inline SVG replaces the old result tick badge.
+- **Smiley mouse:** small, understated line-art mouse replaces the larger cartoon icon.
 - **Result copy:** normal link says "Ok done. Open?". Suspicious links say "Eh, careful.". Non-link QR codes say "Ok done." and allow copying.
-- **Original branding, permissions and shortcut button** preserved.
+- **Scan again:** immediately opens the existing camera consent dialog and starts the camera when confirmed. The idle Scan button is restored if permission is declined.
+- **Shortcut button:** renamed **Add shortcut**.
+- **Result wording:** removed the “Not verified online” badge on ordinary links, while retaining caution/block warnings.
+- **Original branding and permissions** preserved.
 
 ## Deploy to GitHub + Vercel
 
