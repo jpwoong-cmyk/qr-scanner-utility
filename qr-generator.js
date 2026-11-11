@@ -101,7 +101,7 @@ function initializeGenerator() {
               stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </span>
-    <h1 id="qrgen-result-title" tabindex="-1">Ok done. Save?</h1>
+    <h1 id="qrgen-result-title" tabindex="-1">Your QR is ready</h1>\n    <p class="qrgen-result-subtitle">Scan, save, or send it anywhere.</p>
     <div class="qrgen-preview">
       <canvas id="qrgen-final" width="1024" height="1024"
               role="img" aria-label="Generated QR code"></canvas>
@@ -112,13 +112,13 @@ function initializeGenerator() {
          download="SCANme-QR.png" href="#" aria-label="Save QR as PNG">
         Save as PNG
       </a>
-      <button id="qrgen-copy" class="btn btn-secondary" type="button">Copy QR image</button>
-      <button id="qrgen-share" class="btn btn-secondary" type="button">Share QR image</button>
+      <button id="qrgen-copy" class="btn btn-secondary" type="button"><span aria-hidden="true">▣</span> Copy image</button>
+      <button id="qrgen-share" class="btn btn-secondary" type="button"><span aria-hidden="true">↗</span> Share image</button>
       <button id="qrgen-another" class="btn btn-secondary" type="button">
-        Generate another
+        <span aria-hidden="true">↻</span> Generate another
       </button>
       <button id="qrgen-back" class="btn btn-secondary" type="button">
-        Back to Scan
+        <span aria-hidden="true">⌂</span> Back to Scan
       </button>
     </div>
     <p class="qrgen-save-note" id="qrgen-share-status" role="status" aria-live="polite">Copy the QR as an image, share it, or save the PNG.</p>`;
@@ -277,6 +277,49 @@ function initializeGenerator() {
     return { url: URL.createObjectURL(blob), blob };
   }
 
+  // Keep the QR visually anchored while the modal yields to the result.
+  // The transition layer is visual only and never intercepts the result actions.
+  function revealGeneratedResult() {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const origin = assemblyCanvas.getBoundingClientRect();
+    const ghost = document.createElement('div');
+    ghost.className = 'qrgen-reveal-ghost';
+    const preview = document.createElement('canvas');
+    preview.width = assemblyCanvas.width;
+    preview.height = assemblyCanvas.height;
+    preview.getContext('2d').drawImage(assemblyCanvas, 0, 0);
+    ghost.append(preview);
+    Object.assign(ghost.style, {
+      left: `${origin.left}px`, top: `${origin.top}px`,
+      width: `${origin.width}px`, height: `${origin.height}px`
+    });
+    if (!reduced) document.body.append(ghost);
+
+    // Result is ready before closing the modal; no blank intermediate frame.
+    scannerView.hidden = true;
+    result.hidden = false;
+    result.classList.remove('entering');
+    dialog.close();
+    void result.offsetWidth;
+    result.classList.add('entering');
+
+    if (reduced) {
+      heading.focus({ preventScroll: true });
+      return;
+    }
+    const destination = finalCanvas.getBoundingClientRect();
+    requestAnimationFrame(() => {
+      ghost.style.left = `${destination.left}px`;
+      ghost.style.top = `${destination.top}px`;
+      ghost.style.width = `${destination.width}px`;
+      ghost.style.height = `${destination.height}px`;
+      ghost.classList.add('is-completing');
+    });
+    ghost.addEventListener('transitionend', () => ghost.remove(), { once: true });
+    setTimeout(() => ghost.remove(), 850);
+    heading.focus({ preventScroll: true });
+  }
+
   async function generate() {
     if (busy) return;
     error.hidden = true;
@@ -323,13 +366,7 @@ function initializeGenerator() {
       el('#qrgen-result-link').textContent = link;
       finalCanvas.setAttribute('aria-label', `QR code for ${link}`);
 
-      dialog.close();
-      scannerView.hidden = true;
-      result.hidden = false;
-      result.classList.remove('entering');
-      void result.offsetWidth; // Replay existing success check animation.
-      result.classList.add('entering');
-      heading.focus({ preventScroll: true });
+      revealGeneratedResult();
     } catch (err) {
       if (generation === activeGeneration && dialog.open) {
         entry.hidden = false;
