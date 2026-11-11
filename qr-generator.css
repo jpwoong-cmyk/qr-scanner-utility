@@ -76,6 +76,7 @@
 }
 .qrgen-actions > * { flex: none; min-width: 0; }
 #qrgen-save { grid-column: 1 / -1; }
+#qrgen-copy, #qrgen-share { min-height: 44px; }
 .qrgen-save-note { color: #7a8798; font-size: 12px; margin: 13px 0 0; }
 @media (max-width: 480px) {
   .qrgen-inner { padding: 19px 17px; }

@@ -34,6 +34,65 @@ main { flex: 1; min-height: 0; display: flex; }
 .camera-frame { position: relative; isolation: isolate; display: grid; place-items: center; width: 100%; min-height: max(480px, calc(100dvh - 99px)); overflow: hidden; border: 1px solid #25334a; border-radius: 14px; background: #101b2b; }
 .camera-frame video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; opacity: 0; object-fit: contain; background: #070d14; }
 .camera-frame.is-live video { opacity: 1; }
+
+/* Scanner identity: a quiet travelling perimeter light, never an overlay on controls. */
+@property --scan-border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.camera-border-orbit {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  padding: 2px;
+  pointer-events: none;
+  background: conic-gradient(from var(--scan-border-angle), transparent 0deg 290deg, rgba(93,227,244,.05) 305deg, #68edfa 333deg, rgba(93,227,244,.08) 353deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: scanBorderOrbit 8s linear infinite;
+}
+@keyframes scanBorderOrbit { to { --scan-border-angle: 360deg; } }
+
+/* 10-second one-shot laser assembly, replayed on each actual page visit. */
+.qr-repair { width: 82px; height: 82px; overflow: hidden; }
+.qr-repair .qr-repair-art { display: block; width: 60px; height: 60px; overflow: visible; }
+.qr-repair-finders { animation: qrFinderBuild 10s both; }
+.qr-repair-pixels-a { animation: qrPixelsBuildA 10s both; }
+.qr-repair-pixels-b { animation: qrPixelsBuildB 10s both; }
+.qr-repair-pixels-c { animation: qrPixelsBuildC 10s both; }
+.qr-repair-laser { filter: drop-shadow(0 0 3px #69f8e5); animation: qrLaserSweep 10s ease-in-out both; }
+.qr-repair-tool { animation: qrToolRepair 10s ease-in-out both; }
+@keyframes qrFinderBuild { 0%,5% { opacity: .18; } 15%,100% { opacity: 1; } }
+@keyframes qrPixelsBuildA { 0%,23% { opacity: 0; } 28%,100% { opacity: 1; } }
+@keyframes qrPixelsBuildB { 0%,48% { opacity: 0; } 53%,100% { opacity: 1; } }
+@keyframes qrPixelsBuildC { 0%,73% { opacity: 0; } 79%,100% { opacity: 1; } }
+@keyframes qrLaserSweep {
+  0% { opacity: 0; transform: translateY(0); }
+  8% { opacity: 1; }
+  24% { transform: translateY(24px); }
+  45% { transform: translateY(5px); }
+  68% { transform: translateY(52px); opacity: 1; }
+  86%,100% { transform: translateY(60px); opacity: 0; }
+}
+@keyframes qrToolRepair {
+  0% { opacity: 0; transform: translate(15px,-14px); }
+  10% { opacity: 1; transform: translate(0,0); }
+  35% { transform: translate(-12px,10px); }
+  60% { transform: translate(-7px,25px); }
+  82% { opacity: 1; transform: translate(-20px,35px); }
+  94%,100% { opacity: 0; transform: translate(15px,-14px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .camera-border-orbit { animation: none; background: rgba(104,237,250,.25); }
+  .qr-repair-finders, .qr-repair-pixels-a, .qr-repair-pixels-b,
+  .qr-repair-pixels-c { animation: none; opacity: 1; }
+  .qr-repair-laser, .qr-repair-tool { animation: none; display: none; }
+}
+
 /* Holds the last live frame while Android replaces the camera stream. */
 .camera-switch-preview {
   position: absolute;

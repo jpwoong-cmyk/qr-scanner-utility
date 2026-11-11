@@ -112,6 +112,8 @@ function initializeGenerator() {
          download="SCANme-QR.png" href="#" aria-label="Save QR as PNG">
         Save as PNG
       </a>
+      <button id="qrgen-copy" class="btn btn-secondary" type="button">Copy QR image</button>
+      <button id="qrgen-share" class="btn btn-secondary" type="button">Share QR image</button>
       <button id="qrgen-another" class="btn btn-secondary" type="button">
         Generate another
       </button>
@@ -119,7 +121,7 @@ function initializeGenerator() {
         Back to Scan
       </button>
     </div>
-    <p class="qrgen-save-note">On some phones, downloads are saved to Files.</p>`;
+    <p class="qrgen-save-note" id="qrgen-share-status" role="status" aria-live="polite">Copy the QR as an image, share it, or save the PNG.</p>`;
   appMain.append(result);
 
   const el = (selector) => document.querySelector(selector);
@@ -131,9 +133,13 @@ function initializeGenerator() {
   const assemblyCanvas = el('#qrgen-assembly');
   const finalCanvas = el('#qrgen-final');
   const save = el('#qrgen-save');
+  const copyQR = el('#qrgen-copy');
+  const shareQR = el('#qrgen-share');
+  const shareStatus = el('#qrgen-share-status');
   const heading = el('#qrgen-result-title');
   let libraryPromise = null;
   let blobURL = null;
+  let pngBlob = null;
   let activeGeneration = 0;
   let busy = false;
 
@@ -268,7 +274,7 @@ function initializeGenerator() {
   async function preparePNG(canvas) {
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
     if (!blob) throw new Error('PNG export is unavailable in this browser.');
-    return URL.createObjectURL(blob);
+    return { url: URL.createObjectURL(blob), blob };
   }
 
   async function generate() {
@@ -293,9 +299,9 @@ function initializeGenerator() {
       qr.make();
 
       drawQR(finalCanvas, qr);
-      const newBlobURL = await preparePNG(finalCanvas);
+      const png = await preparePNG(finalCanvas);
       if (generation !== activeGeneration || !dialog.open) {
-        URL.revokeObjectURL(newBlobURL);
+        URL.revokeObjectURL(png.url);
         return;
       }
 
@@ -303,13 +309,16 @@ function initializeGenerator() {
       building.hidden = false;
       await animateAssembly(qr, generation);
       if (generation !== activeGeneration || !dialog.open) {
-        URL.revokeObjectURL(newBlobURL);
+        URL.revokeObjectURL(png.url);
         return;
       }
 
       if (blobURL) URL.revokeObjectURL(blobURL);
-      blobURL = newBlobURL;
+      blobURL = png.url;
+      pngBlob = png.blob;
       save.href = blobURL;
+      shareStatus.textContent = 'Copy the QR as an image, share it, or save the PNG.';
+      shareQR.hidden = !navigator.share;
       // The link is displayed as plain text, never injected as HTML.
       el('#qrgen-result-link').textContent = link;
       finalCanvas.setAttribute('aria-label', `QR code for ${link}`);
@@ -345,6 +354,40 @@ function initializeGenerator() {
     trigger.focus();
   }
 
+  copyQR.addEventListener('click', async () => {
+    if (!pngBlob) return;
+    if (!window.isSecureContext || !navigator.clipboard?.write || !window.ClipboardItem) {
+      shareStatus.textContent = 'Image clipboard is unavailable here. Use Share or Save as PNG.';
+      return;
+    }
+    copyQR.disabled = true;
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+      shareStatus.textContent = 'QR image copied. Paste into a supported app.';
+    } catch {
+      shareStatus.textContent = 'This browser blocked image copying. Try Share or Save as PNG.';
+    } finally { copyQR.disabled = false; }
+  });
+
+  shareQR.addEventListener('click', async () => {
+    if (!pngBlob || !navigator.share) return;
+    const file = new File([pngBlob], 'SCANme-QR.png', { type: 'image/png' });
+    const payload = { files: [file], title: 'SCANme-QR' };
+    if (navigator.canShare && !navigator.canShare(payload)) {
+      shareStatus.textContent = 'Sharing QR images is not supported here. Try Copy or Save as PNG.';
+      return;
+    }
+    shareQR.disabled = true;
+    try {
+      await navigator.share(payload);
+      shareStatus.textContent = 'QR image shared.';
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        shareStatus.textContent = 'Unable to share this QR image. Try Copy or Save as PNG.';
+      }
+    } finally { shareQR.disabled = false; }
+  });
+
   trigger.addEventListener('click', openDialog);
   el('#qrgen-close').addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => {
@@ -374,5 +417,6 @@ function initializeGenerator() {
   window.addEventListener('pagehide', () => {
     activeGeneration++;
     if (blobURL) URL.revokeObjectURL(blobURL);
+    pngBlob = null;
   });
 }
