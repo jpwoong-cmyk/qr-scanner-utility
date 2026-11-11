@@ -133,10 +133,16 @@ async function configureZoom(request) {
   ui.zoomValue.textContent = '0';
   ui.zoom.setAttribute('aria-valuetext', '0 extra zoom');
   state.zoomTrack = track;
-  state.zoomRange = { min: range.min, max: range.max };
-  try {
-    // Prefer widest lens range made available by this browser camera track.
-    await track.applyConstraints({ advanced: [{ zoom: range.min }] });
+
+const baseZoom = Math.min(range.max, Math.max(range.min, 1));
+state.zoomRange = { min: baseZoom, max: range.max };
+
+try {
+  // Start at 1x when supported, otherwise use the nearest allowed zoom.
+  await track.applyConstraints({
+    advanced: [{ zoom: baseZoom }]
+  });
+
     if (!state.running || request !== state.request || state.zoomTrack !== track) return;
     ui.zoomContainer.hidden = false;
   } catch { if (state.zoomTrack === track) { state.zoomTrack = null; state.zoomRange = null; } }
