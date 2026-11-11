@@ -369,3 +369,129 @@ body.is-scanning .camera-frame { border: 0; border-radius: 0; width: 100%; heigh
   .camera-frame:not(.is-live):not(.is-transitioning) .inner-border-orbit,
   .camera-frame:not(.is-live):not(.is-transitioning)::after { top: 44%; }
 }
+
+/* SCANme scan/upload/result motion, with no remote site content loading. */
+.camera-frame.is-opening .camera-placeholder {
+  opacity: .72;
+  transform: scale(.985);
+  transition: opacity .35s ease, transform .35s ease;
+}
+.camera-frame .camera-placeholder {
+  transition: opacity .35s ease, transform .35s ease;
+}
+.camera-frame.is-live video {
+  animation: liveCameraReveal .38s ease-out both;
+}
+@keyframes liveCameraReveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.camera-frame.is-upload-processing .idle-panel {
+  opacity: .48;
+  transform: translateY(-10px) scale(.985);
+  transition: opacity .3s ease, transform .3s ease;
+  pointer-events: none;
+}
+.camera-frame.is-upload-processing::after {
+  content: "Reading QR image…";
+  position: absolute;
+  z-index: 8;
+  top: 57%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 10px 15px;
+  border: 1px solid rgba(132,225,245,.35);
+  border-radius: 999px;
+  background: rgba(8,24,42,.94);
+  color: #d6f7ff;
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+  animation: uploadStatusIn .3s ease both;
+}
+@keyframes uploadStatusIn { from { opacity: 0; transform: translate(-50%,-42%); } to { opacity: 1; transform: translate(-50%,-50%); } }
+.scanner-view.returning { animation: scannerReturn .38s ease both; }
+@keyframes scannerReturn { from { opacity: .55; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+#result-view.entering { animation: resultArrive .38s cubic-bezier(.2,.8,.2,1) both; }
+.site-identity {
+  margin-top: 16px;
+  text-align: left;
+  border: 1px solid #dce7f3;
+  border-radius: 13px;
+  background: #fbfdff;
+  overflow: hidden;
+}
+.site-identity-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  background: #edf4fc;
+  color: #4c6581;
+  font-size: 12px;
+  font-weight: 760;
+  letter-spacing: .02em;
+}
+.site-identity-heading .icon { width: 15px; height: 15px; }
+.site-identity-main {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 16px 14px 8px;
+}
+.site-identity-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 49px;
+  width: 49px;
+  height: 49px;
+  border-radius: 12px;
+  background: #e9f2ff;
+  color: #2664b3;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .04em;
+}
+.site-identity-details { min-width: 0; display: grid; gap: 4px; }
+.site-identity-details strong { font-size: 16px; color: #233750; overflow-wrap: anywhere; }
+.site-identity-details span { font-size: 12px; color: #687b91; }
+.site-identity-note {
+  margin: 0;
+  padding: 5px 14px 15px;
+  color: #65788f;
+  font-size: 12px;
+  line-height: 1.55;
+}
+#result-view .result-actions .btn {
+  min-height: 50px;
+  border-radius: 11px;
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+#result-view .result-actions .btn:active { transform: scale(.97); }
+#result-view .result-actions .btn:focus-visible { outline: 3px solid #83b6f6; outline-offset: 2px; }
+@media (max-width: 600px) {
+  #result-view { align-self: flex-start; margin: 18px auto 24px; }
+  #result-view .result-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+  #result-view .result-actions > * { min-width: 0; }
+  #result-view #open-link, #result-view #review-link { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .camera-frame.is-opening .camera-placeholder,
+  .camera-frame .camera-placeholder,
+  .camera-frame.is-upload-processing .idle-panel,
+  #result-view .result-actions .btn { transition: none !important; }
+  .camera-frame.is-live video,
+  .camera-frame.is-upload-processing::after,
+  .scanner-view.returning,
+  #result-view.entering { animation: none !important; }
+}
+
+/* Upload progress takes precedence over the idle decorative ambient glow. */
+.camera-frame.is-upload-processing:not(.is-live):not(.is-transitioning)::after {
+  content: "Reading QR image…";
+  top: 57%;
+  left: 50%;
+  width: auto;
+  height: auto;
+  box-shadow: 0 9px 26px rgba(0,0,0,.18);
+}

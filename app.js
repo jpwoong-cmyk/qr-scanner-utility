@@ -26,6 +26,8 @@ const ui = {
   securityPill: $('#security-pill'), reviewLink: $('#review-link'),
   riskDialog: $('#risk-dialog'), riskMessage: $('#risk-message'), riskOpen: $('#risk-open'),
   riskCancel: $('#risk-cancel'), freeze: $('#freeze-frame'), transition: $('#scan-transition'),
+  identity: $('#site-identity'), identityDomain: $('#site-identity-domain'),
+  identityProtocol: $('#site-identity-protocol'), identityNote: $('#site-identity-note'),
 };
 const state = {
   scanner: null, running: false, starting: false, facing: 'environment',
@@ -83,7 +85,7 @@ function stopScanner(message = 'Camera off') {
   const stream = ui.video.srcObject;
   if (stream?.getTracks) stream.getTracks().forEach(track => track.stop());
   ui.video.srcObject = null;
-  ui.frame.classList.remove('is-live');
+  ui.frame.classList.remove('is-live', 'is-opening');
   ui.flash.setAttribute('aria-pressed', 'false');
   ui.flash.setAttribute('aria-label', 'Turn flash on');
   refreshCameraButtons();
@@ -209,6 +211,28 @@ async function refreshHardwareControls(request) {
     }
   }
 }
+function waitForCameraPicture(request) {
+  const video = ui.video;
+  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth) {
+    return Promise.resolve();
+  }
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      video.removeEventListener('loadeddata', finish);
+      video.removeEventListener('playing', finish);
+      clearTimeout(timeout);
+      resolve();
+    };
+    video.addEventListener('loadeddata', finish, { once: true });
+    video.addEventListener('playing', finish, { once: true });
+    const timeout = setTimeout(finish, 700);
+    if (request !== state.request) finish();
+  });
+}
+
 async function startScanner() {
   if (state.running || state.starting || state.processing || !ui.resultView.hidden) return;
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
@@ -217,6 +241,7 @@ async function startScanner() {
   }
   const request = ++state.request;
   state.starting = true;
+  ui.frame.classList.add('is-opening');
   refreshCameraButtons();
   status('Requesting camera access…');
   try {
@@ -229,7 +254,11 @@ async function startScanner() {
     }
     await state.scanner.start();
     if (request !== state.request || !ui.resultView.hidden) { state.scanner.stop(); return; }
+    // Reveal live video after a frame is available, rather than flashing black.
+    await waitForCameraPicture(request);
+    if (request !== state.request || !ui.resultView.hidden) { state.scanner.stop(); return; }
     state.running = true;
+    ui.frame.classList.remove('is-opening');
     ui.frame.classList.add('is-live');
     status('Scanning', 'live');
     refreshCameraButtons();
@@ -243,6 +272,7 @@ async function startScanner() {
       ui.cameraStatus.dataset.state = 'error';
     }
   } finally {
+    if (request === state.request) ui.frame.classList.remove('is-opening');
     if (request === state.request) state.starting = false;
     refreshCameraButtons();
   }
@@ -440,9 +470,32 @@ function clearTransition() {
   ui.frame.classList.remove('is-transitioning', 'is-checking-upload');
   document.body.classList.remove('is-scanning');
 }
+function updateWebsiteIdentity(audit) {
+  ui.identity.hidden = true;
+  ui.identityDomain.textContent = '';
+  ui.identityProtocol.textContent = '';
+  ui.identityNote.textContent = '';
+
+  // Never load an untrusted destination, favicon, image, iframe or metadata.
+  // Do not show a website card for plain text or a blocked address.
+  if (audit.kind !== 'link' || !audit.href || audit.severity === 'blocked') return;
+  let url;
+  try { url = new URL(audit.href); } catch { return; }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return;
+
+  ui.identityDomain.textContent = url.hostname;
+  ui.identityProtocol.textContent = url.protocol === 'https:'
+    ? 'HTTPS connection requested' : 'HTTP connection requested';
+  ui.identityNote.textContent = audit.severity === 'caution'
+    ? 'Address details only. This link needs your review before opening.'
+    : 'Address details only. This is not a live website preview or a safety guarantee.';
+  ui.identity.hidden = false;
+}
+
 function presentResult(text, audit) {
   state.result = text;
   state.audit = audit;
+  updateWebsiteIdentity(audit);
   ui.resultText.textContent = text; // Plain text, never HTML.
   // Keep useful warnings, but don't show a badge on ordinary results.
   ui.securityPill.hidden = !['caution', 'blocked'].includes(audit.severity);
@@ -459,9 +512,10 @@ function presentResult(text, audit) {
   if (audit.severity === 'review' && audit.href) ui.open.href = audit.href;
   else ui.open.removeAttribute('href');
   ui.riskOpen.removeAttribute('href');
+  // Mount the destination before releasing the scan overlay.
+  ui.resultView.hidden = false;
   ui.scannerView.hidden = true;
   clearTransition();
-  ui.resultView.hidden = false;
   ui.resultView.classList.remove('entering');
   void ui.resultView.offsetWidth;
   ui.resultView.classList.add('entering');
@@ -482,7 +536,7 @@ async function handleDecoded(text) {
   ui.start.hidden = true;
   // Local checks complete immediately; the short delay makes scanning -> result readable.
   const audit = auditQrText(text);
-  await new Promise(resolve => setTimeout(resolve, reduceMotion() ? 100 : 760));
+  await new Promise(resolve => setTimeout(resolve, reduceMotion() ? 0 : 380));
   if (flow !== state.flow || document.hidden) { clearTransition(); state.processing = false; return; }
   state.processing = false;
   presentResult(text, audit);
@@ -522,6 +576,7 @@ async function scanImage(file) {
   state.flow++; state.processing = false; clearTransition();
   if (state.running || state.starting) stopScanner();
   ui.chooseImage.disabled = true;
+  ui.frame.classList.add('is-upload-processing');
   status('Checking image…');
   try {
     await verifyImage(file);
@@ -540,6 +595,7 @@ async function scanImage(file) {
         : 'No QR code found. Try a clearer image.', 'error');
     }
   } finally {
+    ui.frame.classList.remove('is-upload-processing');
     ui.imageInput.value = '';
     ui.chooseImage.disabled = false;
   }
@@ -672,8 +728,12 @@ ui.again.addEventListener('click', () => {
   ui.open.removeAttribute('href');
   ui.linkCaution.hidden = true;
   ui.securityPill.hidden = true;
+  ui.resultView.classList.remove('entering');
   ui.resultView.hidden = true;
   ui.scannerView.hidden = false;
+  ui.scannerView.classList.remove('returning');
+  void ui.scannerView.offsetWidth;
+  ui.scannerView.classList.add('returning');
   refreshCameraButtons(); // Restore Tap to Scan if the user declines permission.
   // Scan again starts a NEW scan, not the idle/upload screen.
   // Retain the per-session permission confirmation requested for security.

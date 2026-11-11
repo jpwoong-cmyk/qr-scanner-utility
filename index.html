@@ -125,6 +125,20 @@
         <p class="security-pill" id="security-pill" hidden></p>
         <div class="result-content" id="result-text" aria-label="Decoded QR content"></div>
         <p class="link-caution" id="link-caution" hidden></p>
+        <section class="site-identity" id="site-identity" aria-label="Website identity" hidden>
+          <div class="site-identity-heading">
+            <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg>
+            <span>Website identity</span>
+          </div>
+          <div class="site-identity-main">
+            <div class="site-identity-icon" aria-hidden="true">WWW</div>
+            <div class="site-identity-details">
+              <strong id="site-identity-domain"></strong>
+              <span id="site-identity-protocol"></span>
+            </div>
+          </div>
+          <p class="site-identity-note" id="site-identity-note"></p>
+        </section>
         <div class="result-actions">
           <a class="btn btn-primary" id="open-link" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden><svg class="icon" aria-hidden="true"><use href="#i-external"/></svg>Open</a>
           <button class="btn btn-primary" id="review-link" type="button" hidden>Review link</button>
