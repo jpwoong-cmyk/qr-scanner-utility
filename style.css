@@ -219,24 +219,3 @@ body.is-scanning .camera-frame { border: 0; border-radius: 0; width: 100%; heigh
   .result-view.entering .check-stroke { animation: none !important; }
   .check-ring, .check-stroke { stroke-dashoffset: 0; }
 }
-
-
-/* Responsive home-screen vertical alignment */
-@media (max-width: 600px) and (orientation: portrait) {
-  .camera-frame:not(.is-live) .idle-panel {
-    min-height: calc(100dvh - 116px);
-    padding: clamp(20px, 8dvh, 85px) 18px;
-    justify-content: flex-start;
-  }
-
-  /* QR symbol occupies the upper portion */
-  .camera-frame:not(.is-live) .idle-mark {
-    margin-bottom: auto;
-  }
-
-  /* Keep all action buttons together near the bottom */
-  .camera-frame:not(.is-live) #start-camera {
-    margin-top: auto;
-  }
-}
-
