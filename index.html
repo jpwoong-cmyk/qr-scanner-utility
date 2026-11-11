@@ -45,24 +45,39 @@
     <main>
       <section class="scanner-view" id="scanner-view" aria-label="QR scanner">
         <div class="camera-frame" id="camera-frame">
-          <span class="camera-border-orbit" aria-hidden="true"></span>
+          <span class="inner-border-orbit" aria-hidden="true"></span>
           <video id="camera-video" autoplay muted playsinline aria-label="Live camera preview"></video>
           <canvas id="camera-switch-preview" class="camera-switch-preview" aria-hidden="true" hidden></canvas>
 
           <div class="camera-placeholder" id="camera-placeholder">
             <div class="idle-panel">
-              <div class="idle-mark qr-repair" aria-hidden="true">
-                <svg class="qr-repair-art" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <g class="qr-repair-finders" stroke="currentColor" stroke-width="2.6">
-                    <rect x="5" y="6" width="19" height="19" rx="1"/><rect x="11" y="12" width="7" height="7" fill="currentColor" stroke="none"/>
-                    <rect x="36" y="6" width="19" height="19" rx="1"/><rect x="42" y="12" width="7" height="7" fill="currentColor" stroke="none"/>
-                    <rect x="5" y="37" width="19" height="19" rx="1"/><rect x="11" y="43" width="7" height="7" fill="currentColor" stroke="none"/>
+              <div class="idle-mark qr-repair pixel-workshop" aria-hidden="true">
+                <svg class="qr-repair-art" viewBox="0 0 100 80" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+                  <!-- The QR pixels are decorative, not a scannable code. -->
+                  <g class="qr-repair-finders" fill="none" stroke="#c5e8f5" stroke-width="3">
+                    <path d="M8 10h18v18H8zM14 16h6v6h-6zM40 10h18v18H40zM46 16h6v6h-6zM8 42h18v18H8zM14 48h6v6h-6z"/>
                   </g>
-                  <g class="qr-repair-pixels-a" fill="currentColor"><rect x="29" y="7" width="4" height="4"/><rect x="29" y="18" width="4" height="4"/><rect x="28" y="29" width="5" height="5"/><rect x="39" y="30" width="5" height="5"/></g>
-                  <g class="qr-repair-pixels-b" fill="currentColor"><rect x="50" y="29" width="5" height="5"/><rect x="29" y="40" width="5" height="5"/><rect x="40" y="40" width="5" height="5"/><rect x="51" y="40" width="5" height="5"/></g>
-                  <g class="qr-repair-pixels-c" fill="currentColor"><rect x="29" y="51" width="5" height="5"/><rect x="40" y="51" width="5" height="5"/><rect x="51" y="51" width="5" height="5"/><rect x="17" y="29" width="5" height="5"/></g>
-                  <g class="qr-repair-laser"><path d="M3 0H61" stroke="#76f8eb" stroke-width="1.5"/><path d="M3 2H61" stroke="#76f8eb" stroke-opacity=".32" stroke-width="4"/></g>
-                  <g class="qr-repair-tool" stroke="#e4f8ff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M60 0L50 11L47 22"/><circle cx="50" cy="11" r="2.6" fill="#6de6d8" stroke="none"/><path d="M43 22L47 27L51 22"/></g>
+                  <g fill="#b6e9fa">
+                    <g class="qr-repair-pixels-a"><path d="M30 12h5v5h-5zM30 23h5v5h-5zM30 34h5v5h-5zM40 34h5v5h-5z"/></g>
+                    <g class="qr-repair-pixels-b"><path d="M52 34h5v5h-5zM30 45h5v5h-5zM41 45h5v5h-5zM52 45h5v5h-5z"/></g>
+                    <g class="qr-repair-pixels-c"><path d="M30 56h5v5h-5zM41 56h5v5h-5zM52 56h5v5h-5zM18 34h5v5h-5z"/></g>
+                  </g>
+                  <!-- Tiny pixel mechanic travels between the missing modules. -->
+                  <g class="pixel-robot">
+                    <rect x="0" y="0" width="19" height="16" rx="2" fill="#67c7e9"/>
+                    <rect x="3" y="3" width="13" height="8" fill="#16304b"/>
+                    <rect x="5" y="5" width="3" height="3" fill="#a5ffdb"/>
+                    <rect x="11" y="5" width="3" height="3" fill="#a5ffdb"/>
+                    <rect x="7" y="-4" width="4" height="4" fill="#d5eff8"/>
+                    <rect x="8" y="-7" width="2" height="3" fill="#79f4df"/>
+                    <rect x="-3" y="5" width="3" height="7" fill="#d0e9f4"/>
+                    <rect x="19" y="5" width="3" height="7" fill="#d0e9f4"/>
+                    <rect x="3" y="16" width="5" height="5" fill="#8aaec4"/>
+                    <rect x="12" y="16" width="5" height="5" fill="#8aaec4"/>
+                    <rect x="22" y="10" width="5" height="3" fill="#ffcf77"/>
+                    <rect x="27" y="8" width="2" height="7" fill="#e7f8ff"/>
+                    <rect class="pixel-spark" x="29" y="9" width="3" height="3" fill="#8fffe1"/>
+                  </g>
                 </svg>
               </div>
               <button class="btn btn-primary" id="start-camera" type="button"><svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg><span>Tap to Scan</span></button>
