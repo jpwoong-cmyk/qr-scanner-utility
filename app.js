@@ -1,5 +1,6 @@
 // SCANme-QR. Only QR decoding happens in the camera; links are audited locally before result display.
 import { auditQrText } from './security/url-audit.js';
+import { inspectSite } from './security/site-inspector.js';
 const QR_LIBRARY_URL = './utility/qr-scanner.min.js';
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_PIXELS = 40_000_000;
@@ -26,8 +27,9 @@ const ui = {
   securityPill: $('#security-pill'), reviewLink: $('#review-link'),
   riskDialog: $('#risk-dialog'), riskMessage: $('#risk-message'), riskOpen: $('#risk-open'),
   riskCancel: $('#risk-cancel'), freeze: $('#freeze-frame'), transition: $('#scan-transition'),
-  identity: $('#site-identity'), identityDomain: $('#site-identity-domain'),
-  identityProtocol: $('#site-identity-protocol'), identityNote: $('#site-identity-note'),
+  inspector: $('#site-inspector'), inspectorStatus: $('#inspector-status'),
+  inspectorHeadline: $('#inspector-headline'), inspectorDomain: $('#inspector-domain'),
+  inspectorFindings: $('#inspector-findings'), inspectorDisclaimer: $('#inspector-disclaimer'),
 };
 const state = {
   scanner: null, running: false, starting: false, facing: 'environment',
@@ -470,32 +472,35 @@ function clearTransition() {
   ui.frame.classList.remove('is-transitioning', 'is-checking-upload');
   document.body.classList.remove('is-scanning');
 }
-function updateWebsiteIdentity(audit) {
-  ui.identity.hidden = true;
-  ui.identityDomain.textContent = '';
-  ui.identityProtocol.textContent = '';
-  ui.identityNote.textContent = '';
-
-  // Never load an untrusted destination, favicon, image, iframe or metadata.
-  // Do not show a website card for plain text or a blocked address.
-  if (audit.kind !== 'link' || !audit.href || audit.severity === 'blocked') return;
-  let url;
-  try { url = new URL(audit.href); } catch { return; }
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') return;
-
-  ui.identityDomain.textContent = url.hostname;
-  ui.identityProtocol.textContent = url.protocol === 'https:'
-    ? 'HTTPS connection requested' : 'HTTP connection requested';
-  ui.identityNote.textContent = audit.severity === 'caution'
-    ? 'Address details only. This link needs your review before opening.'
-    : 'Address details only. This is not a live website preview or a safety guarantee.';
-  ui.identity.hidden = false;
+function showInspection(audit) {
+  const report = inspectSite(audit);
+  ui.inspector.hidden = !report;
+  if (!report) return;
+  ui.inspector.dataset.verdict = report.status;
+  ui.inspectorStatus.textContent = report.status === 'blocked' ? 'Blocked'
+    : report.status === 'caution' ? 'Caution' : 'Checked locally';
+  ui.inspectorHeadline.textContent = report.headline;
+  ui.inspectorDomain.textContent = report.domain;
+  ui.inspectorDisclaimer.textContent = report.caveat;
+  ui.inspectorFindings.replaceChildren();
+  for (const finding of report.findings) {
+    const row = document.createElement('div');
+    row.className = 'inspector-row';
+    const label = document.createElement('span');
+    label.className = 'inspector-label';
+    label.textContent = finding.label;
+    const value = document.createElement('span');
+    value.className = `inspector-value ${finding.level}`;
+    value.textContent = finding.value;
+    row.append(label,value);
+    ui.inspectorFindings.append(row);
+  }
 }
 
 function presentResult(text, audit) {
   state.result = text;
   state.audit = audit;
-  updateWebsiteIdentity(audit);
+  showInspection(audit);
   ui.resultText.textContent = text; // Plain text, never HTML.
   // Keep useful warnings, but don't show a badge on ordinary results.
   ui.securityPill.hidden = !['caution', 'blocked'].includes(audit.severity);

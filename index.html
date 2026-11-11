@@ -125,19 +125,20 @@
         <p class="security-pill" id="security-pill" hidden></p>
         <div class="result-content" id="result-text" aria-label="Decoded QR content"></div>
         <p class="link-caution" id="link-caution" hidden></p>
-        <section class="site-identity" id="site-identity" aria-label="Website identity" hidden>
-          <div class="site-identity-heading">
-            <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg>
-            <span>Website identity</span>
+        <section class="site-inspector" id="site-inspector" aria-label="Offline website security inspection" hidden>
+          <div class="inspector-header">
+            <span>SCANme Security Inspector</span>
+            <span class="inspector-status" id="inspector-status" role="status" aria-live="polite">Checking…</span>
           </div>
-          <div class="site-identity-main">
-            <div class="site-identity-icon" aria-hidden="true">WWW</div>
-            <div class="site-identity-details">
-              <strong id="site-identity-domain"></strong>
-              <span id="site-identity-protocol"></span>
+          <div class="inspector-summary">
+            <span class="inspector-symbol" aria-hidden="true">◈</span>
+            <div>
+              <strong id="inspector-headline">Checking address…</strong>
+              <p id="inspector-domain"></p>
             </div>
           </div>
-          <p class="site-identity-note" id="site-identity-note"></p>
+          <div class="inspector-findings" id="inspector-findings" aria-label="Inspection findings"></div>
+          <p class="inspector-disclaimer" id="inspector-disclaimer"></p>
         </section>
         <div class="result-actions">
           <a class="btn btn-primary" id="open-link" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden><svg class="icon" aria-hidden="true"><use href="#i-external"/></svg>Open</a>
