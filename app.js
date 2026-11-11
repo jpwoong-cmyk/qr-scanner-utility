@@ -10,7 +10,9 @@ const ui = {
   scannerView: $('#scanner-view'), resultView: $('#result-view'),
   frame: $('#camera-frame'), video: $('#camera-video'),
   cameraStatus: $('#camera-status'), cameraStatusText: $('#camera-status-text'),
-  start: $('#start-camera'), stop: $('#stop-camera'), flip: $('#switch-camera'), flash: $('#toggle-flash'),
+  start: $('#start-camera'), stop: $('#stop-camera'),
+  flip: $('#switch-camera'), flash: $('#toggle-flash'),
+  cameraCycle: $('#select-camera'), cameraNumber: $('#camera-number'),
   liveControls: $('#live-controls'), shortcutButton: $('#add-shortcut'), shortcutDialog: $('#shortcut-dialog'),
   shortcutMessage: $('#shortcut-message'), shortcutClose: $('#close-shortcut'),
   zoomContainer: $('#zoom-control'), zoom: $('#zoom-slider'), zoomValue: $('#zoom-value'),
@@ -29,6 +31,7 @@ const state = {
   request: 0, imageRequest: 0, zoomTrack: null, zoomWanted: null,
   zoomApplying: false, zoomRange: null, result: null, toastTimer: null, consentAction: null,
   processing: false, flow: 0, audit: null,
+  cameras: [], cameraSwitching: false,
 };
 let decoderPromise = null;
 
@@ -53,7 +56,11 @@ function refreshCameraButtons() {
   ui.start.querySelector('span').textContent = state.starting ? 'Opening…' : 'Tap to Scan';
   ui.liveControls.hidden = !state.running || state.processing;
   document.body.classList.toggle('is-scanning', state.running);
-  if (!state.running) { ui.flip.hidden = true; ui.flash.hidden = true; }
+  if (!state.running) {
+    ui.flip.hidden = true;
+    ui.flash.hidden = true;
+    ui.cameraCycle.hidden = true;
+  }
 }
 function stopScanner(message = 'Camera off') {
   state.request++;
@@ -62,6 +69,8 @@ function stopScanner(message = 'Camera off') {
   state.zoomTrack = null;
   state.zoomRange = null;
   state.zoomWanted = null;
+  state.cameras = [];
+  ui.cameraCycle.hidden = true;
   ui.zoomContainer.hidden = true;
   if (state.scanner) state.scanner.stop();
   // Explicitly end all camera tracks; do not retain an active camera stream.
@@ -151,13 +160,48 @@ try {
 async function refreshHardwareControls(request) {
   try {
     const supported = await state.scanner.hasFlash();
-    if (state.running && request === state.request) ui.flash.hidden = !supported;
-  } catch { ui.flash.hidden = true; }
+
+    if (state.running && request === state.request) {
+      ui.flash.hidden = !supported;
+    }
+  } catch {
+    if (request === state.request) {
+      ui.flash.hidden = true;
+    }
+  }
+
   try {
     const QrScanner = await getDecoder();
     const cameras = await QrScanner.listCameras();
-    if (state.running && request === state.request) ui.flip.hidden = cameras.length < 2;
-  } catch { ui.flip.hidden = true; }
+
+    if (!state.running || request !== state.request) return;
+
+    state.cameras = cameras.filter(camera => camera.id);
+
+    ui.flip.hidden = state.cameras.length < 2;
+    ui.cameraCycle.hidden = state.cameras.length < 2;
+
+    const track = ui.video.srcObject?.getVideoTracks?.()[0];
+    const activeId = track?.getSettings?.().deviceId;
+
+    const index = state.cameras.findIndex(
+      camera => camera.id === activeId
+    );
+
+    ui.cameraNumber.textContent = String(
+      index >= 0 ? index + 1 : 1
+    );
+
+    ui.cameraCycle.title =
+      `Next camera (${state.cameras.length} detected)`;
+
+  } catch {
+    if (request === state.request) {
+      state.cameras = [];
+      ui.flip.hidden = true;
+      ui.cameraCycle.hidden = true;
+    }
+  }
 }
 async function startScanner() {
   if (state.running || state.starting || state.processing || !ui.resultView.hidden) return;
@@ -197,23 +241,96 @@ async function startScanner() {
     refreshCameraButtons();
   }
 }
-async function flipCamera() {
-  if (!state.running || !state.scanner) return;
-  ui.flip.disabled = true;
+
+async function switchCamera(target) {
+  if (!state.running || !state.scanner || state.cameraSwitching) {
+    return false;
+  }
+
   const request = state.request;
-  const next = state.facing === 'environment' ? 'user' : 'environment';
+
+  state.cameraSwitching = true;
+  ui.flip.disabled = true;
+  ui.cameraCycle.disabled = true;
+
   try {
     state.zoomTrack = null;
+    state.zoomWanted = null;
     ui.zoomContainer.hidden = true;
-    await state.scanner.setCamera(next);
-    if (request !== state.request) return;
-    state.facing = next;
+
+    await state.scanner.setCamera(target);
+
+    if (!state.running || request !== state.request) {
+      return false;
+    }
+
+    const track = ui.video.srcObject?.getVideoTracks?.()[0];
+    const label = track?.label || '';
+
+    if (/front|user|face/i.test(label)) {
+      state.facing = 'user';
+    } else if (/rear|back|environment/i.test(label)) {
+      state.facing = 'environment';
+    } else if (target === 'user' || target === 'environment') {
+      state.facing = target;
+    }
+
     await configureZoom(request);
+
+    if (!state.running || request !== state.request) {
+      return false;
+    }
+
     await refreshHardwareControls(request);
+
     ui.flash.setAttribute('aria-pressed', 'false');
     ui.flash.setAttribute('aria-label', 'Turn flash on');
-  } catch { if (request === state.request) status('Could not switch camera', 'error'); }
-  finally { ui.flip.disabled = false; }
+
+    return true;
+
+  } catch {
+    if (state.running && request === state.request) {
+      toast('Could not switch camera.');
+    }
+
+    return false;
+
+  } finally {
+    state.cameraSwitching = false;
+    ui.flip.disabled = false;
+    ui.cameraCycle.disabled = false;
+  }
+}
+async function flipCamera() {
+  const next = state.facing === 'environment'
+    ? 'user'
+    : 'environment';
+
+  await switchCamera(next);
+}
+
+async function cycleCamera() {
+  if (
+    !state.running ||
+    state.cameraSwitching ||
+    state.cameras.length < 2
+  ) {
+    return;
+  }
+
+  const track = ui.video.srcObject?.getVideoTracks?.()[0];
+  const activeId = track?.getSettings?.().deviceId;
+
+  const current = state.cameras.findIndex(
+    camera => camera.id === activeId
+  );
+
+  const nextIndex = (current + 1) % state.cameras.length;
+  const next = state.cameras[nextIndex];
+
+  if (next) {
+    await switchCamera(next.id);
+  }
 }
 async function toggleFlash() {
   if (!state.running || !state.scanner) return;
@@ -442,6 +559,7 @@ ui.consent.addEventListener('close', () => { state.consentAction = null; });
 ui.start.addEventListener('click', () => askConsent('camera'));
 ui.stop.addEventListener('click', () => { state.flow++; state.processing = false; clearTransition(); stopScanner(); });
 ui.flip.addEventListener('click', flipCamera);
+ui.cameraCycle.addEventListener('click', cycleCamera);
 ui.flash.addEventListener('click', toggleFlash);
 ui.zoom.addEventListener('input', () => {
   if (!state.zoomTrack || !state.zoomRange || !state.running) return;
