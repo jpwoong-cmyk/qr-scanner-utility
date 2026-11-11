@@ -73,6 +73,26 @@ body.is-scanning .camera-frame { border: 0; border-radius: 0; width: 100%; heigh
 .live-tools { position: absolute; bottom: max(22px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 15px; }
 .live-tool { display: grid; place-items: center; width: 48px; height: 48px; color: #fff; border: 1px solid rgba(255,255,255,.3); border-radius: 50%; background: rgba(12,20,34,.73); }
 .live-tool[aria-pressed="true"] { background: #2563eb; }
+.camera-cycle {
+  position: relative;
+}
+.camera-cycle .icon {
+  width: 25px;
+  height: 25px;
+}
+.camera-number {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -22%);
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  background: rgba(12, 20, 34, .85);
+  padding: 1px 2px;
+  border-radius: 2px;
+}
 .zoom-control { position: absolute; right: max(13px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); z-index: 5; width: 42px; height: 196px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 10px 4px 8px; background: rgba(6,17,35,.75); color: #fff; border: 1px solid rgba(255,255,255,.18); border-radius: 24px; backdrop-filter: blur(6px); }
 #zoom-value { font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; }
 #zoom-slider { display: block; width: 114px; height: 24px; margin: 44px -40px 43px; transform: rotate(-90deg); accent-color: #72a4ff; cursor: pointer; touch-action: none; }

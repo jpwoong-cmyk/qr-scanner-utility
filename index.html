@@ -73,10 +73,14 @@
           </div>
           <div class="live-controls" id="live-controls" hidden>
             <button class="live-stop" id="stop-camera" type="button" aria-label="Stop scanning"><svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg><span>Stop</span></button>
-            <div class="live-tools">
-              <button class="live-tool" id="switch-camera" type="button" aria-label="Flip camera" title="Flip camera" hidden><svg class="icon" aria-hidden="true"><use href="#i-flip"/></svg></button>
-              <button class="live-tool" id="toggle-flash" type="button" aria-label="Turn flash on" title="Flash" aria-pressed="false" hidden><svg class="icon" aria-hidden="true"><use href="#i-flash"/></svg></button>
-            </div>
+          <div class="live-tools">
+            <button class="live-tool" id="switch-camera" type="button" aria-label="Flip camera" title="Flip camera" hidden><svg class="icon" aria-hidden="true"><use href="#i-flip"/></svg></button>
+            <button class="live-tool" id="toggle-flash" type="button" aria-label="Turn flash on" title="Flash" aria-pressed="false" hidden><svg class="icon" aria-hidden="true"><use href="#i-flash"/></svg></button>
+            <button class="live-tool camera-cycle" id="select-camera" type="button" aria-label="Switch to next detected camera" title="Next camera" hidden>
+              <svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg>
+              <span class="camera-number" id="camera-number">1</span>
+            </button>
+          </div>
           </div>
         </div>
         <input type="file" id="image-input" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" class="visually-hidden" aria-label="Choose QR image from documents">
