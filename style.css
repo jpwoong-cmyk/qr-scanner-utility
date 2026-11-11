@@ -99,14 +99,14 @@ body.is-scanning .camera-frame { border: 0; border-radius: 0; width: 100%; heigh
 .shortcut-inner .btn { width: 100%; }
 .toast { position: fixed; z-index: 100; left: 50%; bottom: max(22px, env(safe-area-inset-bottom)); transform: translateX(-50%); border-radius: 8px; background: #243951; color: #fff; padding: 12px 17px; font-size: 13px; max-width: calc(100vw - 30px); text-align: center; box-shadow: 0 12px 24px rgba(0,0,0,.15); }
 @media (max-width: 480px) {
-  .app-shell { width: calc(100% - 16px); }
-  .topbar { gap: 5px; }
+  .app-shell { width: 100%; }
+  .topbar { gap: 5px; padding-inline: 12px; }
   .brand-icon { width: 66px; height: 32px; padding: 2px; }
   .wordmark { font-size: 17px; }
   .brand-qr { width: 18px; height: 18px; }
   .shortcut-trigger { padding: 6px 8px; gap: 5px; }
   .shortcut-trigger span { font-size: 11px; }
-  .camera-frame { min-height: max(440px, calc(100dvh - 91px)); border-radius: 10px; }
+  .camera-frame { min-height: max(440px, calc(100dvh - 91px)); border-radius: 0; border-left: 0; border-right:0; }
   .result-view { padding: 23px 15px; }
 }
 @media (max-width: 355px) {
