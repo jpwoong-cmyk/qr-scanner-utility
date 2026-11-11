@@ -9,6 +9,7 @@ const $ = (selector) => document.querySelector(selector);
 const ui = {
   scannerView: $('#scanner-view'), resultView: $('#result-view'),
   frame: $('#camera-frame'), video: $('#camera-video'),
+  cameraSwitchPreview: $('#camera-switch-preview'),
   cameraStatus: $('#camera-status'), cameraStatusText: $('#camera-status-text'),
   start: $('#start-camera'), stop: $('#stop-camera'),
   flip: $('#switch-camera'), flash: $('#toggle-flash'),
@@ -31,7 +32,7 @@ const state = {
   request: 0, imageRequest: 0, zoomTrack: null, zoomWanted: null,
   zoomApplying: false, zoomRange: null, result: null, toastTimer: null, consentAction: null,
   processing: false, flow: 0, audit: null,
-  cameras: [], cameraSwitching: false,
+  cameras: [], cameraSwitching: false, cameraTransition: 0,
 };
 let decoderPromise = null;
 
@@ -70,6 +71,11 @@ function stopScanner(message = 'Camera off') {
   state.zoomRange = null;
   state.zoomWanted = null;
   state.cameras = [];
+  state.cameraTransition++; // Invalidate an unfinished camera reveal.
+  state.cameraSwitching = false;
+  ui.flip.disabled = false;
+  ui.cameraCycle.disabled = false;
+  resetCameraSwitchPreview();
   ui.cameraCycle.hidden = true;
   ui.zoomContainer.hidden = true;
   if (state.scanner) state.scanner.stop();
@@ -242,16 +248,84 @@ async function startScanner() {
   }
 }
 
+// Keep the previous frame over the video until the replacement lens starts producing frames.
+function resetCameraSwitchPreview() {
+  const canvas = ui.cameraSwitchPreview;
+  canvas.hidden = true;
+  canvas.classList.remove('is-switching', 'is-revealing');
+  canvas.width = 0;
+  canvas.height = 0;
+}
+
+function captureCameraSwitchFrame(transition) {
+  const video = ui.video;
+  const canvas = ui.cameraSwitchPreview;
+  if (!video.videoWidth || !video.videoHeight) return false;
+
+  try {
+    const scale = Math.min(1, 1280 / video.videoWidth);
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    canvas.getContext('2d', { alpha: false }).drawImage(
+      video, 0, 0, canvas.width, canvas.height
+    );
+    canvas.classList.remove('is-switching', 'is-revealing');
+    canvas.hidden = false;
+
+    requestAnimationFrame(() => {
+      if (state.cameraTransition === transition && !canvas.hidden) {
+        canvas.classList.add('is-switching');
+      }
+    });
+    return true;
+  } catch {
+    resetCameraSwitchPreview();
+    return false;
+  }
+}
+
+function waitForNewCameraFrame(video) {
+  return new Promise(resolve => {
+    let settled = false;
+    let frameId = null;
+    let timeoutId;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      video.removeEventListener('loadeddata', onLoaded);
+      if (frameId !== null && video.cancelVideoFrameCallback) {
+        video.cancelVideoFrameCallback(frameId);
+      }
+      resolve();
+    };
+    const onLoaded = () => requestAnimationFrame(() => requestAnimationFrame(finish));
+
+    // Don't hold an old frame forever if a camera never becomes ready.
+    timeoutId = setTimeout(finish, 1000);
+    if (typeof video.requestVideoFrameCallback === 'function') {
+      frameId = video.requestVideoFrameCallback(finish);
+    } else if (video.readyState >= 2 && video.videoWidth > 0) {
+      onLoaded();
+    } else {
+      video.addEventListener('loadeddata', onLoaded, { once: true });
+    }
+  });
+}
+
 async function switchCamera(target) {
   if (!state.running || !state.scanner || state.cameraSwitching) {
     return false;
   }
 
   const request = state.request;
-
+  const transition = ++state.cameraTransition;
   state.cameraSwitching = true;
   ui.flip.disabled = true;
   ui.cameraCycle.disabled = true;
+  const captured = captureCameraSwitchFrame(transition);
+  let switched = false;
 
   try {
     state.zoomTrack = null;
@@ -259,14 +333,10 @@ async function switchCamera(target) {
     ui.zoomContainer.hidden = true;
 
     await state.scanner.setCamera(target);
-
-    if (!state.running || request !== state.request) {
-      return false;
-    }
+    if (!state.running || request !== state.request) return false;
 
     const track = ui.video.srcObject?.getVideoTracks?.()[0];
     const label = track?.label || '';
-
     if (/front|user|face/i.test(label)) {
       state.facing = 'user';
     } else if (/rear|back|environment/i.test(label)) {
@@ -276,29 +346,36 @@ async function switchCamera(target) {
     }
 
     await configureZoom(request);
-
-    if (!state.running || request !== state.request) {
-      return false;
-    }
-
+    if (!state.running || request !== state.request) return false;
     await refreshHardwareControls(request);
 
     ui.flash.setAttribute('aria-pressed', 'false');
     ui.flash.setAttribute('aria-label', 'Turn flash on');
-
+    switched = true;
     return true;
-
   } catch {
     if (state.running && request === state.request) {
       toast('Could not switch camera.');
     }
-
     return false;
-
   } finally {
-    state.cameraSwitching = false;
-    ui.flip.disabled = false;
-    ui.cameraCycle.disabled = false;
+    const current = () => state.running && request === state.request &&
+      transition === state.cameraTransition;
+
+    if (captured && switched && current()) {
+      await waitForNewCameraFrame(ui.video);
+      if (current() && !reduceMotion()) {
+        ui.cameraSwitchPreview.classList.add('is-revealing');
+        await new Promise(resolve => setTimeout(resolve, 380));
+      }
+    }
+
+    if (transition === state.cameraTransition) {
+      resetCameraSwitchPreview();
+      state.cameraSwitching = false;
+      ui.flip.disabled = false;
+      ui.cameraCycle.disabled = false;
+    }
   }
 }
 async function flipCamera() {
