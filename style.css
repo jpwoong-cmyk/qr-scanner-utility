@@ -98,6 +98,7 @@ body.is-scanning .camera-frame { border: 0; border-radius: 0; width: 100%; heigh
 .permission-actions .btn { width: 100%; }
 .shortcut-inner .btn { width: 100%; }
 .toast { position: fixed; z-index: 100; left: 50%; bottom: max(22px, env(safe-area-inset-bottom)); transform: translateX(-50%); border-radius: 8px; background: #243951; color: #fff; padding: 12px 17px; font-size: 13px; max-width: calc(100vw - 30px); text-align: center; box-shadow: 0 12px 24px rgba(0,0,0,.15); }
+
 @media (max-width: 480px) {
   .app-shell { width: calc(100% - 16px); }
   .topbar { gap: 5px; }
@@ -106,7 +107,23 @@ body.is-scanning .camera-frame { border: 0; border-radius: 0; width: 100%; heigh
   .brand-qr { width: 18px; height: 18px; }
   .shortcut-trigger { padding: 6px 8px; gap: 5px; }
   .shortcut-trigger span { font-size: 11px; }
-  .camera-frame { min-height: max(440px, calc(100dvh - 91px)); border-radius: 10px; }
+
+  .camera-frame {
+    min-height: max(440px, calc(100dvh - 91px));
+    border-radius: 10px;
+  }
+
+  /* Home screen: distribute content vertically */
+  .camera-frame:not(.is-live) .idle-panel {
+    height: 100%;
+    justify-content: flex-end;
+    padding: clamp(18px, 4dvh, 36px) 18px;
+  }
+
+  .camera-frame:not(.is-live) .idle-mark {
+    margin-bottom: auto;
+  }
+
   .result-view { padding: 23px 15px; }
 }
 @media (max-width: 355px) {
@@ -219,3 +236,24 @@ body.is-scanning .camera-frame { border: 0; border-radius: 0; width: 100%; heigh
   .result-view.entering .check-stroke { animation: none !important; }
   .check-ring, .check-stroke { stroke-dashoffset: 0; }
 }
+
+
+/* Responsive home-screen vertical alignment */
+@media (max-width: 600px) and (orientation: portrait) {
+  .camera-frame:not(.is-live) .idle-panel {
+    min-height: calc(100dvh - 116px);
+    padding: clamp(20px, 8dvh, 85px) 18px;
+    justify-content: flex-start;
+  }
+
+  /* QR symbol occupies the upper portion */
+  .camera-frame:not(.is-live) .idle-mark {
+    margin-bottom: auto;
+  }
+
+  /* Keep all action buttons together near the bottom */
+  .camera-frame:not(.is-live) #start-camera {
+    margin-top: auto;
+  }
+}
+
